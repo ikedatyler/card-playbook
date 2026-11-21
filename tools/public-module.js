@@ -263,7 +263,7 @@ function publicSuggestions(){
   var bal=0; Object.keys(S.balances||{}).forEach(function(k){ bal+=(S.balances[k]||0)*((S.cpp[k]||1)/100); });
   if (bal>0) R.push(['Put your points to work', 'Your points and miles are worth about '+money(bal)+' at the app\'s values, often more when transferred for flights or hotels. Programs devalue over time, so plan a trip and transfer only after you\'ve found an award seat.', '']);
   if (!R.length) R.push(['You\'re set up well', 'Keep using the Pay tab before each purchase. Tips appear here as you log spending, grab offers and check off credits.', '']);
-  h+='<div class="card"><h2>Maximize rewards</h2>'+R.map(tipHTML).join('')+'</div>';
+  h+='<div class="card"><h2>Maximize rewards</h2>'+R.map(tipHTML).join('')+'</div>'+walletReview();
   var C=[
     ['Pay the full statement balance', 'Interest (often 20–30% APR) cancels out rewards fast. Set AutoPay on every card to the full statement balance.', ''],
     ['Keep balances low at closing', 'Utilization, meaning balances divided by limits, is reported on each card\'s closing date and drives about 30% of your score. Paying down before closing keeps it under 10%.', ''],

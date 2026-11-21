@@ -512,6 +512,14 @@ nav.tabbar button.on svg{color:#9ff5d0;filter:drop-shadow(0 0 9px rgba(52,211,15
 .opaste{margin-top:12px}
 .opaste textarea{min-height:70px}
 
+#wallet-review h3{font-size:15px;letter-spacing:.01em}
+.tip details.wrd{margin-top:8px}
+.tip details.wrd summary{cursor:pointer;font-size:13px;font-weight:600;opacity:.85;list-style:none}
+.tip details.wrd summary::-webkit-details-marker{display:none}
+.tip details.wrd summary::before{content:"+ "}
+.tip details.wrd[open] summary::before{content:"− "}
+.tip details.wrd span{display:block;margin-top:6px;font-size:13px;line-height:1.5;opacity:.85}
+
 /* ---- Public app: card picker ---- */
 body.pk-open{overflow:hidden}
 .pk-ov{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
@@ -1320,6 +1328,279 @@ function monthlyNow(){
   });
   t.total=tot; return t;
 }
+// ---- Wallet review: which cards earn their keep, what to drop, add or combine ----
+// Works from the cards you hold, your logged spending (annualized) and the card database.
+var WR_DB=null;
+function wrDB(){
+  if (WR_DB) return WR_DB; WR_DB={};
+  try{ (JSON.parse((document.getElementById('carddb')||{}).textContent||'{}').cards||[]).forEach(function(x){ WR_DB[x.id]=x; }); }catch(e){}
+  return WR_DB;
+}
+// Co-brand point values (¢) when neither you nor the database set one.
+var WR_CPP={delta:1.1,hilton:0.5,marriott:0.7,hyatt:1.7,ihg:0.5,united:1.2,sw:1.3,aa:1.2,atmos:1.3,wf:1.0};
+// Yearly perks that aren't statement credits. auto = arrives on its own (full value); otherwise counted like credits.
+var WR_ANNIV={
+  'vx':[{name:'10,000 anniversary miles',pts:10000,auto:1}],
+  'sw-plus':[{name:'3,000 anniversary points',pts:3000,auto:1}],
+  'sw-priority':[{name:'7,500 anniversary points',pts:7500,auto:1}],
+  'hyatt':[{name:'Category 1–4 free night each year',amt:150}],
+  'ihg-premier':[{name:'Anniversary free night (up to 40k points)',amt:120}],
+  'marriott-boundless':[{name:'Anniversary free night (up to 35k points)',amt:150}],
+  'marriott-brilliant':[{name:'Anniversary free night (up to 85k points)',amt:400}],
+  'hilton-aspire':[{name:'Free night reward each year',amt:300}],
+  'delta-plat':[{name:'Companion certificate each year',amt:200}],
+  'delta-reserve':[{name:'Companion certificate each year',amt:250}],
+  'atmos-ascent':[{name:'Companion fare each year',amt:200}],
+  'atmos-summit':[{name:'25,000-point Global Companion Award',amt:250}]
+};
+var WR_LOUNGE={'amex-plat':'Centurion and Priority Pass lounges','csr':'Chase Sapphire and Priority Pass lounges','vx':'Capital One and Priority Pass lounges','united-club':'United Club membership','delta-reserve':'Delta Sky Club visits','aa-exec':'Admirals Club membership','citi-strata-elite':'Priority Pass lounges','atmos-summit':'Alaska Lounge passes'};
+var WR_MEMBER={'robinhood-gold':[50,'Needs a Robinhood Gold membership ($50/yr)'],'costco':[0,'Needs a Costco membership'],'target-circle':[0,'Works only at Target']};
+var WR_ROTATE={'disc':'Discover\'s 5% quarterly categories','cff':'Freedom Flex\'s 5% quarterly categories'};
+var WR_PICK={'custom-cash':{cats:['dining','grocery','gas','drugstore','streaming','flights','hotels'],rate:5,limit:6000},'boa-custom':{cats:['gas','dining','drugstore','flights','hotels'],rate:3,limit:10000}};
+var WR_PREMIUM={chase:['csp','csr','ink-preferred'],citi:['citi-strata-premier','citi-strata-elite']};
+var WR_CHARGE={'amex-plat':1,'gold':1,'amex-green':1};
+var WR_SKIP={rent:1,abroad:1};
+var WR_DEFAULT_SPEND={dining:4000,grocery:6000,gas:2500,flights:1500,hotels:1500,streaming:400,phone:1200,other:12000};
+var WR_CAT_NAME={dining:'dining',grocery:'groceries',gas:'gas',costco:'Costco',superstore:'Target/Walmart',flights:'flights',hotels:'hotels',cars:'car rentals',drugstore:'drugstores',streaming:'streaming',phone:'your phone bill',other:'everything else'};
+
+function wrSpend(){
+  var t={}, tot=0;
+  Object.keys(S.spent||{}).forEach(function(key){ var k=key.split(':')[1]; if(!k||WR_SKIP[k]) return; var v=S.spent[key]||0; if(v>0){ t[k]=(t[k]||0)+v; tot+=v; } });
+  var now=new Date(), day=Math.max(30,(now-new Date(now.getFullYear(),0,1))/864e5), f=365/day;
+  if (tot<1000) return {sp:JSON.parse(JSON.stringify(WR_DEFAULT_SPEND)), sample:true};
+  Object.keys(t).forEach(function(k){ t[k]*=f; });
+  return {sp:t, sample:false};
+}
+function wrCardModel(c, held){
+  var db=wrDB(), x=db[c.id]||{}, m={id:c.id, name:c.name||x.name, issuer:x.issuer||'', currency:c.currency||x.currency||'cash', network:c.network||x.network||'',
+    fee:(held? (c.id==='costco'?(x.fee||0):(c.fee!=null?c.fee:(x.fee!=null?x.fee:(DEFAULT_FEE[c.id]||0)))) : (x.fee||0)),
+    rates:JSON.parse(JSON.stringify((held&&c.rates&&Object.keys(c.rates).length)?c.rates:(x.rates||c.rates||{}))),
+    caps:JSON.parse(JSON.stringify((held&&c.rates&&Object.keys(c.rates).length)?(c.caps||{}):(x.caps||{}))),
+    credits:x.credits||[], perks:x.perks||{}, cpp:x.cpp, rent:!!(c.rent||x.rent), kind:x.kind||'', held:held, popular:!!x.popular};
+  if (WR_ROTATE[m.id]){ Object.keys(m.rates).forEach(function(k){ if(m.rates[k]>=5) delete m.rates[k]; }); delete m.caps.dining; }
+  if (m.id==='custom-cash') m.rates={}; // handled by WR_PICK
+  // Airline and hotel co-brand bonuses only apply to that brand, so they don't count toward general flights/hotels.
+  if (m.kind==='airline'||m.kind==='hotel'){ m.brandOnly={}; ['flights','hotels'].forEach(function(k){ if(m.rates[k]!=null&&m.rates[k]>(m.rates.other||1)){ m.brandOnly[k]=m.rates[k]; delete m.rates[k]; } }); }
+  return m;
+}
+function wrCpp(m, set){
+  var cur=m.currency; if (cur==='cash') return 1;
+  var base=(S.cpp&&S.cpp[cur])||m.cpp||WR_CPP[cur]||1.3;
+  var prem=WR_PREMIUM[cur];
+  if (prem && prem.indexOf(m.id)<0 && !set.some(function(o){ return prem.indexOf(o.id)>=0; })) return 1; // points stay cash-back-only without a premium card
+  return base;
+}
+function wrRate(m,k){ var r=m.rates[k]; if(r==null) r=(m.rates.other!=null?m.rates.other:1); return r; }
+function wrOk(m,k){ return k!=='costco' || m.network==='visa'; } // Costco warehouses take Visa only
+// Best possible yearly rewards for a set of cards, using each card where it earns most (with caps).
+function wrEarn(set, sp){
+  var tot=0, by={}, win={};
+  set.forEach(function(m){ by[m.id]=0; win[m.id]={}; m._c=wrCpp(m,set); });
+  Object.keys(sp).forEach(function(k){
+    var amt=sp[k]; if(!amt) return; var slots=[];
+    set.forEach(function(m){ if(!wrOk(m,k)) return;
+      var pk=WR_PICK[m.id];
+      if (pk){ var best=null; pk.cats.forEach(function(c){ if(!best||(sp[c]||0)>(sp[best]||0)) best=c; }); if(best===k) slots.push({m:m,v:pk.rate*m._c,lim:pk.limit}); slots.push({m:m,v:1*m._c,lim:1e12}); return; }
+      var cap=m.caps&&m.caps[k], r=wrRate(m,k);
+      if (cap&&cap.limit){ slots.push({m:m,v:r*m._c,lim:cap.limit}); slots.push({m:m,v:(cap.after!=null?cap.after:1)*m._c,lim:1e12}); }
+      else slots.push({m:m,v:r*m._c,lim:1e12});
+    });
+    slots.sort(function(a,b){return b.v-a.v;});
+    var left=amt;
+    for (var i=0;i<slots.length&&left>0;i++){ var s=slots[i], use=Math.min(left,s.lim); var val=use*s.v/100; tot+=val; by[s.m.id]+=val; win[s.m.id][k]=(win[s.m.id][k]||0)+use; left-=use; }
+  });
+  return {tot:tot, by:by, win:win};
+}
+function wrPerYear(c){ return c.amt*({month:12,quarter:4,half:2,year:1}[c.per]||1); }
+function wrExtras(m, cf){
+  var cr=0, face=0; (m.credits||[]).forEach(function(c){ var y=wrPerYear(c); face+=y; cr+=y*cf; });
+  (WR_ANNIV[m.id]||[]).forEach(function(a){ if (a.pts){ var v=a.pts*((S.cpp&&S.cpp[m.currency])||m.cpp||WR_CPP[m.currency]||1.3)/100; cr+=v; face+=v; } else { face+=a.amt; cr+=a.amt*cf; } });
+  if (WR_ROTATE[m.id]){ cr+=120; face+=240; }
+  return {v:cr, face:face};
+}
+function wrNet(set, sp, cf){
+  var e=wrEarn(set,sp), ex=0, fee=0;
+  set.forEach(function(m){ ex+=wrExtras(m,cf).v; fee+=m.fee+((WR_MEMBER[m.id]||[0])[0]); });
+  return {net:e.tot+ex-fee, earn:e, extras:ex, fees:fee};
+}
+function wrCats(win){ var a=Object.keys(win).filter(function(k){return win[k]>=200;}).sort(function(x,y){return win[y]-win[x];}); return a.map(function(k){return WR_CAT_NAME[k]||k;}); }
+function wrList(a){ return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]; }
+function wrPerkSet(m){ var p=[]; var P=m.perks||{};
+  if (P.cars&&P.cars[0]>=5) p.push('primary rental car coverage');
+  if (P.phone) p.push('cell phone protection');
+  if (P.flights&&P.flights[0]>=1.5) p.push('trip delay and baggage coverage');
+  if (!P.abroad) p.push('no foreign transaction fee');
+  if (WR_LOUNGE[m.id]) p.push(WR_LOUNGE[m.id]);
+  return p; }
+function wrPtsVal(m){ return (S.cpp&&S.cpp[m.currency])||m.cpp||WR_CPP[m.currency]||1.3; }
+// Value of keeping an existing points balance transferable (vs cashing out at 1¢) when this card is what unlocks transfers.
+function r0pool(m, held, bal){
+  var prem=WR_PREMIUM[m.currency]; if(!prem||prem.indexOf(m.id)<0||!bal) return 0;
+  if (held.some(function(o){ return o.id!==m.id && prem.indexOf(o.id)>=0; })) return 0;
+  return Math.max(0, bal*(wrPtsVal(m)-1)/100);
+}
+function wrDowngrade(m, set, sp, cf){
+  var db=wrDB(), opts=Object.keys(db).map(function(id){return db[id];}).filter(function(x){ return x.issuer===m.issuer && x.currency===m.currency && x.id!==m.id && (x.fee||0)<m.fee && x.kind!=='business' && !set.some(function(o){return o.id===x.id;}); });
+  var others=set.filter(function(o){return o.id!==m.id;}), best=null;
+  opts.forEach(function(x){ var mm=wrCardModel(x,false), n=wrNet(others.concat([mm]),sp,cf).net, same=x.currency===m.currency?1:0;
+    if(!best||same>best.same||(same===best.same&&n>best.n)) best={x:x,n:n,same:same}; });
+  return best;
+}
+function wrCreditNote(m, ctx){
+  var s=[];
+  if (WR_CHARGE[m.id]) s.push('It\'s a charge card with no preset limit, so closing it won\'t raise your utilization.');
+  else s.push('Closing it removes its credit limit, so the same balances become a higher share of your total limit (utilization, about 30% of your score). That hit starts with the next report and lasts as long as your other limits stay the same.');
+  s.push('The account stays on your report for up to 10 years if it was in good standing, and FICO keeps counting it toward your average age until it falls off, so the age hit comes much later. If it\'s one of your oldest cards, keep it open.');
+  if (m.fee>0) s.push('Most issuers refund the annual fee if you close or downgrade within about 30 days of it posting.');
+  return s.join(' ');
+}
+function wrAddNote(x, held){
+  var s=['A new application adds a hard inquiry (often 5–10 points, mostly back within a few months; FICO counts it for 12 months and it drops off after 2 years) and lowers your average account age.'];
+  if (x.issuer==='Chase') s.push('Chase usually declines if you\'ve opened 5 or more personal cards with any bank in the last 24 months (5/24).');
+  if (x.issuer==='American Express') s.push('Amex gives each welcome bonus once per lifetime, and may skip it if you\'ve had a related card.');
+  if (x.issuer==='Capital One') s.push('Capital One usually approves about one new card every 6 months.');
+  if (x.issuer==='Citi') s.push('Citi limits new cards to 1 every 8 days and 2 every 65 days.');
+  if (held.some(function(h){return h.issuer===x.issuer;})) s.push('You may be able to product-change one of your '+x.issuer+' cards into it instead: no inquiry, and the account keeps its age, but no welcome bonus.');
+  s.push('Skip new cards in the 6–12 months before a mortgage or car loan.');
+  return s.join(' ');
+}
+
+function wrMore(t,body){ return '<details class="wrd"><summary>'+t+'</summary><span>'+body+'</span></details>'; }
+
+function walletReview(){
+  var db=wrDB(); if (!Object.keys(db).length || !S.cards.length) return '';
+  var cf=(S.wrCredit==null?0.5:S.wrCredit), W=wrSpend(), sp=W.sp;
+  var held=S.cards.map(function(c){ return wrCardModel(c,true); });
+  var base=wrNet(held,sp,cf);
+  var rows=[], drops=[], overlap=[];
+  held.forEach(function(m){
+    var others=held.filter(function(o){return o.id!==m.id;});
+    var wo=wrNet(others,sp,cf), marg=base.net-wo.net, ex=wrExtras(m,cf), earnOwn=base.earn.by[m.id]||0;
+    var earnDelta=base.earn.tot-wo.earn.tot, cats=wrCats(base.earn.win[m.id]||{});
+    var perks=wrPerkSet(m), uniq=perks.filter(function(p){ return !others.some(function(o){ return wrPerkSet(o).indexOf(p)>=0; }); });
+    var pooled=WR_PREMIUM[m.currency]&&WR_PREMIUM[m.currency].indexOf(m.id)>=0&&held.some(function(o){return o.id!==m.id&&o.currency===m.currency&&WR_PREMIUM[m.currency].indexOf(o.id)<0;});
+    var bal=(S.balances&&S.balances[m.currency])||0;
+    var st= (m.rent&&S.rent>0)||m.fee===0 ? 'keep' : (marg>=40?'keep':(marg>=0?'review':'drop'));
+    var keepVal= r0pool(m,held,bal);
+    rows.push({m:m,marg:marg,earnDelta:earnDelta,cats:cats,ex:ex,uniq:uniq,pooled:pooled,st:st,bal:bal,keepVal:keepVal});
+    if (earnDelta<25 && marg<40 && st==='keep' && !(m.rent&&S.rent>0)){
+      var beat=others.filter(function(o){ return Object.keys(base.earn.win[o.id]||{}).length; }).map(function(o){return o.name;});
+      overlap.push({m:m,beat:beat});
+    }
+    if (st!=='keep') drops.push(rows[rows.length-1]);
+  });
+
+  // Cards to add
+  var have={}; held.forEach(function(m){have[m.id]=1;});
+  var hasBilt=held.some(function(m){return m.currency==='bilt';});
+  var cands=Object.keys(db).map(function(id){return db[id];}).filter(function(x){ return !have[x.id] && x.kind!=='business' && !(hasBilt&&x.currency==='bilt'); });
+  var base0=wrNet(held,sp,0);
+  var adds=cands.map(function(x){ var mm=wrCardModel(x,false), n=wrNet(held.concat([mm]),sp,cf); return {x:x,mm:mm,gain:n.net-base.net,gain0:wrNet(held.concat([mm]),sp,0).net-base0.net,n:n}; })
+    .filter(function(a){return a.gain>=50;}).sort(function(a,b){return (b.gain+b.gain0)-(a.gain+a.gain0);}).slice(0,3);
+
+  // Gaps: categories where your best card returns under 2%
+  var gaps=[];
+  Object.keys(sp).forEach(function(k){ if(sp[k]<500) return; var best=0, bm=null;
+    held.forEach(function(m){ if(!wrOk(m,k)) return; var v=wrRate(m,k)*wrCpp(m,held); if(v>best){best=v;bm=m;} });
+    if (best<2){ var fill=null; cands.forEach(function(x){ var mm=wrCardModel(x,false); if(!wrOk(mm,k)) return; var v=wrRate(mm,k)*wrCpp(mm,held.concat([mm])); if(v>=best+0.5&&(!fill||v>fill.v)) fill={x:x,v:v}; });
+      gaps.push({k:k,best:best,bm:bm,fill:fill}); } });
+
+  // Combine: replace one or two fee cards with one new card
+  var combos=[];
+  var feeHeld=held.filter(function(m){return m.fee>0 && !(m.rent&&S.rent>0);});
+  var pairs=[]; feeHeld.forEach(function(a,i){ for(var j=i+1;j<feeHeld.length;j++) pairs.push([a,feeHeld[j]]); });
+  if (feeHeld.length===1) {}
+  // also allow a fee card paired with a no-fee card it overlaps
+  held.forEach(function(a){ if(a.fee>0) return; feeHeld.forEach(function(b){ if (overlap.some(function(o){return o.m.id===a.id;})) pairs.push([b,a]); }); });
+  var weight={}; rows.forEach(function(r){ weight[r.m.id]=r.earnDelta; });
+  pairs.forEach(function(pr){
+    if (pr.some(function(m){ return (weight[m.id]||0)<25; })) return; // both cards must be doing real work
+    var rest=held.filter(function(m){return pr.indexOf(m)<0;});
+    cands.forEach(function(x){ var mm=wrCardModel(x,false), n=wrNet(rest.concat([mm]),sp,cf), g=n.net-base.net, g0=wrNet(rest.concat([mm]),sp,0).net-base0.net;
+      if (g>=40 && g0>=0) combos.push({out:pr,x:x,gain:g,fees:pr.reduce(function(s,m){return s+m.fee;},0)}); });
+  });
+  combos.sort(function(a,b){return b.gain-a.gain;});
+  var seen={}, cTop=[]; combos.forEach(function(c){ var k=c.out.map(function(m){return m.id;}).join('+'); if(seen[k]||seen['x:'+c.x.id]||cTop.length>=2) return; seen['x:'+c.x.id]=1; if(adds[0]&&adds[0].x.id===c.x.id&&c.gain<=adds[0].gain+20) return; seen[k]=1; cTop.push(c); });
+
+  // ---- Render ----
+  var h='<div class="card" id="wallet-review"><h2>Card recommendations</h2>';
+  h+='<p class="sub" style="margin:0 0 10px">Based on '+(W.sample?'a typical household\'s spending (log some purchases to make this yours)':'your logged spending, scaled to a full year ('+money(Object.keys(sp).reduce(function(s,k){return s+sp[k];},0))+')')+', with each card used where it earns most.</p>';
+  h+='<div class="kpis"><div class="kpi"><b>'+money(base.earn.tot)+'</b><span>rewards a year if each purchase goes on the right card</span></div><div class="kpi"><b>'+money(base.extras)+'</b><span>credits & perks you\'d use</span></div><div class="kpi"><b>'+money(base.fees)+'</b><span>annual fees</span></div><div class="kpi"><b>'+money(base.net)+'</b><span>net value of your wallet</span></div></div>';
+  h+='<div class="row" style="margin:10px 0 4px;align-items:center"><span class="sub" style="margin:0;flex:none">Credits I\'d actually use</span></div><div class="seg" style="margin-bottom:12px">'+[[0,'None'],[0.5,'About half'],[1,'All']].map(function(o){return '<button data-act="wrc" data-v="'+o[0]+'"'+(cf===o[0]?' class="on"':'')+'>'+o[1]+'</button>';}).join('')+'</div>';
+
+  h+='<h3 style="margin:14px 0 6px">What each card does for you</h3>';
+  rows.sort(function(a,b){return b.marg-a.marg;}).forEach(function(r){
+    var m=r.m, chip={keep:['',''],review:['',' w'],drop:['',' w']}[r.st];
+    var why=[];
+    if (r.cats.length) why.push('Best card for '+wrList(r.cats)+(r.earnDelta>=5?', adding about '+money(r.earnDelta)+' a year over your next-best cards':'')+'.');
+    else why.push('Not your best card for any category you spend in.');
+    if (r.ex.face>0) why.push('Credits and perks worth '+money(r.ex.face)+' at face value (counted as '+money(r.ex.v)+').');
+    if (m.fee>0) why.push('Fee '+money(m.fee)+'.'); else why.push('No annual fee.');
+    if (r.uniq.length) why.push('Only card in your wallet with '+wrList(r.uniq)+'.');
+    if (r.pooled) why.push('It also makes your other '+(CUR[m.currency]||'points')+' transferable to airlines and hotels.');
+    if (m.rent&&S.rent>0) why.push('Earns points on your rent (not counted here), so keep it.');
+    if (m.brandOnly) why.push('Its higher rate on its own brand\'s '+Object.keys(m.brandOnly).map(function(k){return WR_CAT_NAME[k];}).join(' and ')+' isn\'t counted.');
+    if (WR_ROTATE[m.id]) why.push(WR_ROTATE[m.id]+' are counted at about $120 a year if you activate each quarter.');
+    if (WR_MEMBER[m.id]) why.push(WR_MEMBER[m.id][1]+'.');
+    h+=tipHTML([esc(m.name), why.join(' '), (r.marg>=0?'+':'−')+money(Math.abs(r.marg))+'/yr', chip[1]]);
+  });
+  h+='<p class="hint" style="margin-top:2px">The amount is what your wallet would lose each year without that card, after its fee.</p>';
+
+  if (overlap.length){
+    h+='<h3 style="margin:16px 0 6px">Overlap</h3>';
+    overlap.forEach(function(o){ var m=o.m, r=rows.filter(function(x){return x.m.id===m.id;})[0];
+      h+=tipHTML([esc(m.name)+' is mostly covered', 'Your other cards already earn as much or more everywhere you spend'+(o.beat.length?' ('+esc(wrList(o.beat))+')':'')+'.'+(r&&r.pooled?' It still matters because it unlocks transfers for your other '+(CUR[m.currency]||'points')+'.':'')+(m.fee===0?' With no fee, keeping it open still helps your credit: it adds to your total limit and your account age. Put one small bill on it so it isn\'t closed for inactivity.':''), '']); });
+  }
+
+  if (drops.length){
+    h+='<h3 style="margin:16px 0 6px">Could drop or downgrade</h3>';
+    drops.sort(function(a,b){return a.marg-b.marg;}).forEach(function(r){
+      var m=r.m, dg=m.fee>0?wrDowngrade(m,held,sp,cf):null, t=[];
+      t.push('Without it your wallet nets about '+money(Math.abs(r.marg))+' a year '+(r.marg<0?'more':'less')+'.');
+      if (r.uniq.length) t.push('You\'d lose '+wrList(r.uniq)+', since no other card of yours has '+(r.uniq.length>1?'them':'it')+'.');
+      if (r.keepVal>0) t.push('Weigh that against your points: keeping it lets your '+Math.round(r.bal).toLocaleString()+' '+(CUR[m.currency]||'points')+' transfer at about '+wrPtsVal(m)+'¢ instead of 1¢ as cash back, worth about '+money(r.keepVal)+' if you use them for travel. If you\'ll redeem them for travel, keeping it is likely worth the fee.');
+      if (r.pooled && r.bal>0) t.push('Important: your '+Math.round(r.bal).toLocaleString()+' '+(CUR[m.currency]||'points')+' only transfer to airlines and hotels while you hold this card. Use or transfer them first, or move them to another card from the same program before you change anything.');
+      else if (r.bal>0 && !held.some(function(o){return o.id!==m.id&&o.currency===m.currency;})) t.push('Use your '+Math.round(r.bal).toLocaleString()+' '+(CUR[m.currency]||'points')+' before closing: they can be lost when the last card earning them closes.');
+      if (dg && m.fee>0) t.push('Better than closing: ask '+m.issuer+' to product-change it to the '+dg.x.name+(dg.x.fee?' ('+money(dg.x.fee)+' fee)':' (no annual fee)')+'. You keep the account\'s age and limit, and there\'s no hard inquiry.');
+      if (!dg && m.fee>0) t.push('Better than closing: ask '+m.issuer+' whether it has a no-annual-fee version of this card you can switch to. That keeps the account open with no hard inquiry.');
+      if (m.fee===0) t.push('With no fee, keeping it open costs nothing and helps your credit, so closing it rarely makes sense.');
+      h+=tipHTML([(m.fee>0?'Downgrade or close ':'Keep, but rarely use ')+esc(m.name), t.join(' ')+wrMore('How closing affects your credit',wrCreditNote(m)), (r.marg<0?'+':'−')+money(Math.abs(r.marg))+'/yr', r.marg<0?'':'w']);
+    });
+  }
+
+  if (gaps.length){
+    h+='<h3 style="margin:16px 0 6px">Gaps</h3>';
+    gaps.sort(function(a,b){return sp[b.k]-sp[a.k];}).slice(0,3).forEach(function(g){
+      var nm=WR_CAT_NAME[g.k]||g.k;
+      h+=tipHTML(['Under 2% back on '+nm, 'You spend about '+money(sp[g.k])+' a year on '+nm+', and your best card for it returns about '+(Math.floor(g.best*10)/10).toFixed(1)+'%'+(g.bm?' ('+esc(g.bm.name)+')':'')+'.'+(g.k==='costco'&&!g.bm?' Costco warehouses take only Visa cards.':'')+(g.fill?' The '+esc(g.fill.x.name)+' would return about '+g.fill.v.toFixed(1)+'%.':''), '']); });
+  }
+
+  h+='<h3 style="margin:16px 0 6px">Cards worth adding</h3>';
+  if (!adds.length) h+='<p class="sub">No card in the database adds at least $50 a year after its fee for your spending. Your wallet already covers it well.</p>';
+  adds.forEach(function(a){ var x=a.x, cats=wrCats(a.n.earn.win[x.id]||{}), ex=wrExtras(a.mm,cf), t=[];
+    t.push(cats.length?'It would become your best card for '+wrList(cats)+'.':(WR_ROTATE[x.id]?'Its value comes from '+WR_ROTATE[x.id]+' (about $120 a year if you activate each quarter).':'Its value comes mostly from credits and perks.'));
+    if (a.mm.brandOnly) t.push('Its higher rate on its own brand\'s '+Object.keys(a.mm.brandOnly).map(function(k){return WR_CAT_NAME[k];}).join(' and ')+' isn\'t counted, since that depends on how often you use that brand.');
+    if (ex.face>0) t.push('Credits and perks worth '+money(ex.face)+' at face value (counted as '+money(ex.v)+').');
+    t.push(x.fee?'Fee '+money(x.fee)+'.':'No annual fee.');
+    var pk=wrPerkSet(a.mm).filter(function(p){ return !held.some(function(o){return wrPerkSet(o).indexOf(p)>=0;}); }); if (pk.length) t.push('Adds '+wrList(pk)+'.');
+    if (WR_MEMBER[x.id]) t.push(WR_MEMBER[x.id][1]+'.');
+    if (ex.face>(x.fee||0) && a.gain0<0) t.push('Most of its value is credits: if you wouldn\'t use them, it costs about '+money(-a.gain0)+' a year. Count only credits that replace spending you\'d do anyway.');
+    t.push('Welcome bonuses aren\'t counted, so year one is usually better.');
+    h+=tipHTML(['Add '+esc(x.name), t.join(' ')+wrMore('How applying affects your credit',wrAddNote(x,held)), '+'+money(a.gain)+'/yr']); });
+  if (!hasBilt && S.rent>0) h+=tipHTML(['You pay rent: look at Bilt', 'Bilt cards can earn points on rent with no fee from Bilt, and they transfer to Hyatt, United, Alaska and more. Rent isn\'t counted in the numbers above.', '']);
+
+  if (cTop.length){
+    h+='<h3 style="margin:16px 0 6px">Combine into one card</h3>';
+    cTop.forEach(function(c){ var names=c.out.map(function(m){return esc(m.name);}), cats=wrCats(wrEarn(held.filter(function(m){return c.out.indexOf(m)<0;}).concat([wrCardModel(c.x,false)]),sp).win[c.x.id]||{});
+      var lost=[]; c.out.forEach(function(m){ wrPerkSet(m).forEach(function(pk){ var rest=held.filter(function(o){return c.out.indexOf(o)<0;}).concat([wrCardModel(c.x,false)]); if(lost.indexOf(pk)<0 && !rest.some(function(o){return wrPerkSet(o).indexOf(pk)>=0;})) lost.push(pk); }); });
+      c.out.forEach(function(m){ var bal=(S.balances&&S.balances[m.currency])||0; if (bal>0 && m.currency!=='cash' && !held.some(function(o){return c.out.indexOf(o)<0&&o.currency===m.currency;})) lost.push('your '+Math.round(bal).toLocaleString()+' '+(CUR[m.currency]||'points')+' unless you use or transfer them first'); });
+      h+=tipHTML(['Swap '+wrList(names)+' for the '+esc(c.x.name), (lost.length?'You\'d give up '+wrList(lost)+'. ':'')+'One '+esc(c.x.name)+(cats.length?' (your best card for '+wrList(cats)+')':'')+' does more for you than '+(c.out.length>1?'those two together':names[0])+', even after fees ('+money(c.x.fee||0)+' versus '+money(c.fees)+' now). Downgrade rather than close where you can, to keep the accounts\' age and limits.'+wrMore('How this affects your credit',wrAddNote(c.x,held)+' '+wrCreditNote(c.out[0]).replace(/^It\'s a charge card[^.]*\. /,'')), '+'+money(c.gain)+'/yr']); });
+  }
+  h+='<p class="foot">Assumes you use each card where it earns most. Points are valued at your settings ('+(S.cpp&&S.cpp.amex||1.3)+'¢ for bank points); Chase and Citi points from no-fee cards count as cash back unless you hold a Sapphire, Ink Preferred or Strata Premier/Elite. Rent, portal bookings and welcome bonuses aren\'t included. Credit-score effects vary by person and scoring model. General information, not financial advice.</p>';
+  h+='</div>';
+  return h;
+}
+
 function viewSuggestions(){ return ''; }
 
 // ---- Card faces: original designs in each card's color (not the issuers' artwork) ----
@@ -2230,7 +2511,7 @@ function buildDoc(){
   var ijson=(document.getElementById('inbox')||{textContent:'{"asOf":"","updates":[]}'}).textContent;
   var ejson=(document.getElementById('emailoffers')||{textContent:'{"asOf":"","items":[]}'}).textContent;
   var end='<'+'/script>';
-  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="theme-color" content="'+themeHex('#06100c')+'">\n<title>Card Playbook</title>\n<style id="css">'+css+'</style>\n</head>\n<body>\n<div class="wrap" id="app"></div>\n<div class="toast" id="toast"></div>\n<script id="state" type="application/json">'+json+end+'\n<script id="transfers" type="application/json">'+tjson+end+'\n<script id="inbox" type="application/json">'+ijson+end+'\n<script id="emailoffers" type="application/json">'+ejson+end+'\n<script id="main">'+js+end+'\n</body>\n</html>\n';
+  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="theme-color" content="'+themeHex('#06100c')+'">\n<title>Card Playbook</title>\n<style id="css">'+css+'</style>\n</head>\n<body>\n<div class="wrap" id="app"></div>\n<div class="toast" id="toast"></div>\n<script id="state" type="application/json">'+json+end+'\n<script id="transfers" type="application/json">'+tjson+end+'\n<script id="inbox" type="application/json">'+ijson+end+'\n<script id="emailoffers" type="application/json">'+ejson+end+'\n<script id="carddb" type="application/json">'+((document.getElementById('carddb')||{}).textContent||'{"cards":[]}')+end+'\n<script id="main">'+js+end+'\n</body>\n</html>\n';
 }
 
 function changed(skipRender){
@@ -2309,6 +2590,7 @@ document.addEventListener('click',function(e){
   if(b.dataset.ben){ S.benefits=S.benefits||{}; S.benefits[b.dataset.ben]=!S.benefits[b.dataset.ben]; var by=window.scrollY; changed(); window.scrollTo(0,by); return; }
   if(b.dataset.copy){ var cc=b.dataset.copy; try{ navigator.clipboard.writeText(cc).then(function(){toast('Copied '+cc);},function(){toast('Code: '+cc);}); }catch(err){ toast('Code: '+cc); } return; }
   if(b.dataset.edone){ S.emailDone=S.emailDone||{}; S.emailDone[b.dataset.edone]=1; var ey=window.scrollY; changed(); window.scrollTo(0,ey); return; }
+  if(b.dataset.act==='wrc'){ S.wrCredit=Number(b.dataset.v); var wy=window.scrollY; changed(); window.scrollTo(0,wy); return; }
   if(b.dataset.act==='emailreset'){ S.emailDone={}; changed(); return; }
   if(b.dataset.ofc!==undefined){ OFFER_CARD=b.dataset.ofc; render(); return; }
   if(b.dataset.offer){
@@ -2749,7 +3031,7 @@ function publicSuggestions(){
   var bal=0; Object.keys(S.balances||{}).forEach(function(k){ bal+=(S.balances[k]||0)*((S.cpp[k]||1)/100); });
   if (bal>0) R.push(['Put your points to work', 'Your points and miles are worth about '+money(bal)+' at the app\'s values, often more when transferred for flights or hotels. Programs devalue over time, so plan a trip and transfer only after you\'ve found an award seat.', '']);
   if (!R.length) R.push(['You\'re set up well', 'Keep using the Pay tab before each purchase. Tips appear here as you log spending, grab offers and check off credits.', '']);
-  h+='<div class="card"><h2>Maximize rewards</h2>'+R.map(tipHTML).join('')+'</div>';
+  h+='<div class="card"><h2>Maximize rewards</h2>'+R.map(tipHTML).join('')+'</div>'+walletReview();
   var C=[
     ['Pay the full statement balance', 'Interest (often 20–30% APR) cancels out rewards fast. Set AutoPay on every card to the full statement balance.', ''],
     ['Keep balances low at closing', 'Utilization, meaning balances divided by limits, is reported on each card\'s closing date and drives about 30% of your score. Paying down before closing keeps it under 10%.', ''],

@@ -61,6 +61,7 @@ const html = `<!DOCTYPE html>
 <script id="transfers" type="application/json">${transfers}</script>
 <script id="inbox" type="application/json">{"asOf":"","updates":[]}</script>
 <script id="emailoffers" type="application/json">{"asOf":"","items":[]}</script>
+<script id="carddb" type="application/json">${esc(fs.readFileSync(path.join(root, 'app/cards.json'), 'utf8'))}</script>
 <script id="main" type="text/plain">${esc(main)}</script>
 <script id="boot">${boot}</script>
 </body>

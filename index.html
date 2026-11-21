@@ -517,7 +517,7 @@ nav.tabbar button.on svg{color:#9ff5d0;filter:drop-shadow(0 0 9px rgba(52,211,15
 <div class="toast" id="toast"></div>
 <script id="state" type="application/json">{}</script>
 <script id="transfers" type="application/json">{
-"asOf":"2026-11-19",
+"asOf":"2026-11-20",
 "partners":{
 "aerlingus":{"n":"Aer Lingus AerClub","t":"air","avios":1},
 "aeromexico":{"n":"Aeromexico Rewards","t":"air"},
@@ -560,10 +560,11 @@ nav.tabbar button.on svg{color:#9ff5d0;filter:drop-shadow(0 0 9px rgba(52,211,15
 },
 "routes":{
 "amex":{"aerlingus":1,"aeromexico":1.6,"aircanada":1,"flyingblue":1,"ana":1,"avianca":1,"ba":1,"cathay":0.8,"choice":1,"delta":1,"emirates":0.8,"hilton":2,"iberia":1,"jetblue":0.8,"lhw":0.25,"marriott":1,"qantas":1,"qatar":1,"singapore":1,"virgin":1},
-"chase":{"aerlingus":1,"aircanada":1,"flyingblue":1,"ba":1,"hyatt":"chase-hyatt","iberia":1,"ihg":1,"jetblue":1,"marriott":1,"singapore":1,"southwest":1,"united":1,"virgin":1,"wyndham":1},
+"chase":{"aerlingus":1,"aircanada":1,"flyingblue":1,"ba":1,"cathay":1,"qantas":1,"hyatt":"chase-hyatt","iberia":1,"ihg":1,"jetblue":1,"marriott":1,"singapore":1,"southwest":1,"united":1,"virgin":1,"wyndham":1},
 "c1":{"accor":0.5,"aeromexico":1,"aircanada":1,"flyingblue":1,"avianca":1,"ba":1,"cathay":1,"choice":1,"copa":0.75,"emirates":0.75,"etihad":1,"eva":0.75,"finnair":1,"jal":0.75,"jetblue":0.6,"ipre":2,"qantas":1,"qatar":1,"singapore":1,"tap":1,"turkish":1,"virgin":1,"wyndham":1},
 "bilt":{"accor":0.667,"aerlingus":1,"aircanada":1,"flyingblue":1,"alaska":1,"amtrak":0.5,"avianca":1,"ba":1,"cathay":1,"emirates":1,"etihad":1,"hilton":1,"hyatt":"bilt-hyatt","iberia":1,"ihg":1,"jal":1,"jetblue":1,"marriott":1,"ipre":2,"qatar":1,"southwest":1,"tap":1,"turkish":1,"united":1,"virgin":1,"wyndham":1},
-"citi":{"accor":0.5,"flyingblue":1,"american":1,"avianca":1,"cathay":1,"choice":1.5,"emirates":0.8,"etihad":1,"eva":1,"jal":1,"jetblue":1,"lhw":0.2,"ipre":2,"qantas":1,"qatar":1,"singapore":1,"thai":1,"turkish":1,"virgin":1,"wyndham":1}
+"citi":{"accor":0.5,"flyingblue":1,"american":1,"avianca":1,"cathay":1,"choice":1.5,"copa":1,"emirates":0.8,"etihad":1,"eva":1,"jal":1,"jetblue":1,"lhw":0.2,"ipre":2,"qantas":1,"qatar":1,"singapore":1,"thai":1,"turkish":1,"virgin":1,"wyndham":1},
+"wf":{"aerlingus":1,"flyingblue":1,"avianca":1,"ba":1,"cathay":1,"iberia":1,"jetblue":1,"virgin":1,"choice":2,"wyndham":2}
 },
 "bonuses":[
 {"from":"amex","to":"hilton","pct":40,"ends":"2026-11-24"},
@@ -605,7 +606,7 @@ var CATS = [
   ['rent','Rent','Monthly payment']
 ];
 var SPEND_CATS = CATS.filter(function(c){return c[0]!=='rent';});
-var CUR = {amex:'Amex points', chase:'Chase points', c1:'Capital One miles', bilt:'Bilt points', citi:'Citi points', cash:'cash back', other:'points'};
+var CUR = {amex:'Amex points', chase:'Chase points', c1:'Capital One miles', bilt:'Bilt points', citi:'Citi points', wf:'Wells Fargo points', cash:'cash back', other:'points'};
 var NET = {visa:'Visa', mastercard:'Mastercard', amex:'Amex', discover:'Discover'};
 
 function defaultCards(){
@@ -632,7 +633,7 @@ if (MODE === 'local') { try { var st = JSON.parse(localStorage.getItem('cardplay
 var PARTNERS = T.partners, ROUTES = T.routes, BONUSES = T.bonuses;
 function asOfLabel(){ return fmtDate(T.asOf); }
 function dataAgeDays(){ return Math.floor((new Date() - new Date(T.asOf+'T12:00:00'))/86400000); }
-var POINT_CURS = ['amex','chase','c1','bilt','citi'];
+var POINT_CURS = ['amex','chase','c1','bilt','citi','wf'];
 var SHORT = {amex:'Amex', chase:'Chase', c1:'Capital One', bilt:'Bilt', citi:'Citi'};
 // Airline alliance membership (as of Nov 2026). Kept here, not in the transfers JSON, so data refreshes don't touch it.
 var ALLIANCE = {

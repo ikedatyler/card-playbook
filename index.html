@@ -543,6 +543,20 @@ nav.tabbar button.on svg{color:#9ff5d0;filter:drop-shadow(0 0 9px rgba(52,211,15
 #portals .phead h2{margin:0}
 #portals .prow-m small.ppay{opacity:.9;margin-top:2px}
 #portals .prow-m small.ppay b{font-weight:600!important;font-size:12px!important;white-space:normal!important;display:inline!important}
+
+.htcard{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.htcard span{display:flex;flex-direction:column;gap:2px}.htcard b{font-size:16px}.htcard small{opacity:.7;font-size:13px}.htcard i{font-style:normal;font-size:22px;opacity:.6}
+.seglbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin:14px 0 6px}
+details.imp{margin-top:12px}details.imp>summary{font-weight:600;cursor:pointer}
+.stack2>details.card{margin-bottom:10px}
+.seg.isec{margin-bottom:12px}
+.link.htl{background:none;border:0;padding:0;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+details.gd-s{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);margin-bottom:8px}
+details.gd-s>summary{list-style:none;cursor:pointer;padding:13px 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+details.gd-s>summary::-webkit-details-marker{display:none}
+details.gd-s>summary::after{content:"";width:7px;height:7px;border:solid currentColor;opacity:.6;border-width:0 1.8px 1.8px 0;transform:rotate(45deg);margin-right:4px}
+details.gd-s[open]>summary::after{transform:rotate(-135deg)}
+.gd-b{padding:0 14px 12px;font-size:14px;line-height:1.55}.gd-b p{margin:0 0 8px}
 </style>
 </head>
 <body>
@@ -709,13 +723,14 @@ function allianceRoutes(al){
   return rows.sort(function(a,b){ return am(a)-am(b) || b.eff-a.eff || b.bal-a.bal; });
 }
 function viewAllianceRoutes(){
-  var h='<div class="card"><h2>Transfer to an alliance</h2><p class="sub" style="margin:0">Alliances don\'t take points directly. You transfer to one member airline, then use those miles on any airline in that alliance. Below: every live bonus into each alliance, plus the best regular ratio from each of your currencies.</p></div>';
+  var h='<h3 class="sec">Transfer to an alliance</h3><p class="hint" style="margin:-4px 4px 10px">Transfer to one member airline, then book any airline in its alliance.</p>';
   ALLIANCES.forEach(function(a){
     if (a[0]==='none') return;
     var rs=allianceRoutes(a[0]);
     var curs={}; rs.forEach(function(r){curs[r.cur]=1;});
-    h+='<div class="card"><div class="chead"><b>'+a[1]+'</b><span class="sub">'+Object.keys(curs).length+' of your currencies</span></div>';
-    if (!rs.length){ h+='<p class="why">None of your points reach this alliance.</p></div>'; return; }
+    var top=rs[0];
+    h+='<details class="card more"><summary>'+a[1]+'<span class="sumr">'+(rs.length?'best '+fmtRatio(top.eff)+' from '+SHORT[top.cur]+(rs.some(function(r){return r.bonus;})?' · bonus live':''):'not reachable')+'</span></summary>';
+    if (!rs.length){ h+='<p class="why">None of your points reach this alliance.</p></details>'; return; }
     h+='<div class="rank">';
     rs.forEach(function(r){
       var gets = r.bal ? ' · your '+r.bal.toLocaleString()+' → '+Math.floor(r.bal*r.eff).toLocaleString() : '';
@@ -725,9 +740,8 @@ function viewAllianceRoutes(){
       if (r.k.length===1 && r.k[0]==='aeromexico' && r.eff>1) detail+=' · ratio looks high but Aeromexico awards cost more miles';
       h+='<div class="rk" style="cursor:default"><div class="nm"><b>'+SHORT[r.cur]+(r.bonus?' <span class="tag hi">+'+r.bonus.pct+'%</span>':'')+'</b><small>→ '+esc(title)+'<br>'+detail+gets+'</small></div><div class="pc">'+fmtRatio(r.eff)+'</div></div>';
     });
-    h+='</div></div>';
+    h+='</div><p class="hint" style="margin:8px 0 0">The best ratio isn\'t always the cheapest award. Search the award first, then pick the program.</p></details>';
   });
-  h+='<p class="foot" style="margin-top:-4px;margin-bottom:12px">Best ratio isn\'t always the cheapest award: each airline charges a different number of miles for the same partner flight. Search the award first, then pick the program.</p>';
   return h;
 }
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -810,11 +824,10 @@ function txRemove(t){
 }
 function txCard(){
   var list=(S.txns||[]).filter(function(t){return !t.x;});
-  var h='<div class="card"><h2>Synced purchases'+(TX_NEW?' '+rdot():'')+'</h2>';
-  h+='<p class="hint" style="margin:0 0 8px">From purchase alert emails, every evening. Change a category with the menu; remove refunds or declines with ×.</p>';
+  var h='<details class="card more txs"><summary>Recent purchases'+(TX_NEW?' '+rdot():'')+'<span class="sumr">'+(list.length?list.length+' synced':'none yet')+'</span></summary>';
   var sending={}; list.forEach(function(t){ sending[t.card]=1; });
   var quiet=S.cards.filter(function(c){return !sending[c.id];}).map(function(c){return c.name;});
-  if (quiet.length) h+='<div class="note">No alerts yet from: '+esc(quiet.join(', '))+'. Turn on email alerts for every purchase ($0 and up) in each card\'s app.</div>';
+  if (quiet.length) h+='<div class="note">No purchase alerts yet from '+esc(quiet.join(', '))+'. '+howtoLink('purchases','Set them up')+'</div>';
   if (!list.length) h+='<p class="sub" style="margin:8px 0 0">No synced purchases yet.</p>';
   list.slice(0,15).forEach(function(t){
     var c=cardById(t.card);
@@ -823,7 +836,7 @@ function txCard(){
       +'<b class="txa">$'+t.amt.toFixed(2)+'</b><button class="txx" data-txdel="'+esc(t.id)+'" aria-label="Remove">\u00d7</button></div>';
   });
   if (list.length>15) h+='<p class="sub" style="margin:8px 0 0">+'+(list.length-15)+' earlier purchases counted.</p>';
-  return h+'</div>';
+  return h+'</details>';
 }
 INBOX.updates.forEach(function(u){
   if (!u || !u.id) return;
@@ -1039,12 +1052,11 @@ function viewBilt(){
   return h;
 }
 
+var RSEQ=0, TOPC={seq:-1,m:{}};
+function topCardFor(k){ if(TOPC.seq!==RSEQ) TOPC={seq:RSEQ,m:{}}; if(!(k in TOPC.m)){ var r=ranked(k)[0]; TOPC.m[k]=r&&r.ok?r.card.id:null; } return TOPC.m[k]; }
 function cardTags(c){
   var best=[];
-  SPEND_CATS.forEach(function(k){
-    var r=ranked(k[0]);
-    if (r[0] && r[0].ok && r[0].card.id===c.id) best.push(k[0]);
-  });
+  SPEND_CATS.forEach(function(k){ if (topCardFor(k[0])===c.id) best.push(k[0]); });
   var h='<div class="tags">';
   SPEND_CATS.forEach(function(k){
     var v=(c.rates&&typeof c.rates[k[0]]==='number')?c.rates[k[0]]:(best.indexOf(k[0])>=0?rateOf(c,k[0]):1);
@@ -1140,9 +1152,6 @@ function rewardsSoFar(c){
   // Points reported by the issuer are exact (they include bonuses and odd categories), so prefer them.
   if (rep && rep.pts) return {v:rep.cash?rep.pts:rep.pts*ptVal(c), logged:logged, pts:rep.cash?0:rep.pts, cashAmt:rep.cash?rep.pts:0, since:rep.since};
   return {v:v, logged:logged};
-}
-function creditsPerYear(c){
-  return CREDITS.filter(function(cr){return cr.card===c.id && cr.amt;}).reduce(function(t,cr){return t+cr.amt*(PER_YEAR[cr.per]||1);},0);
 }
 // ---- Card value tracker: rewards + credits used + benefits, against the annual fee ----
 var BENEFITS = [
@@ -1263,7 +1272,7 @@ function statementCard(){
       +'<div class="ins"><label>Close<input type="number" inputmode="numeric" min="1" max="31" placeholder="—" data-close="'+c.id+'" value="'+(r.day||'')+'"></label>'
       +'<label>Due<input type="number" inputmode="numeric" min="1" max="31" placeholder="—" data-due="'+c.id+'" value="'+(c.dueDay||'')+'"></label></div></div>';
   });
-  h+='<p class="hint">Sorted by next closing. The balance on the closing date is what gets reported, so pay down a few days before to show low utilization, then pay in full by the due date.</p></details>';
+  h+='<p class="hint">Pay down a few days before each close to report a low balance, then pay in full by the due date.</p></details>';
   return h;
 }
 
@@ -1307,7 +1316,7 @@ function monthlyNow(){
 // Works from the cards you hold, your logged spending (annualized) and the card database.
 var WR_DB=null;
 function wrDB(){
-  if (WR_DB) return WR_DB; WR_DB={};
+  if (WR_DB) return WR_DB; if (typeof CARD_DB!=='undefined' && Object.keys(CARD_DB).length) return (WR_DB=CARD_DB); WR_DB={};
   try{ (JSON.parse((document.getElementById('carddb')||{}).textContent||'{}').cards||[]).forEach(function(x){ WR_DB[x.id]=x; }); }catch(e){}
   return WR_DB;
 }
@@ -1442,7 +1451,13 @@ function wrAddNote(x, held){
 
 function wrMore(t,body){ return '<details class="wrd"><summary>'+t+'</summary><span>'+body+'</span></details>'; }
 
+var WR_CACHE={k:'',h:''};
 function walletReview(){
+  var key=JSON.stringify([S.cards.map(function(c){return [c.id,c.fee,c.rates,c.caps];}),S.spent,S.wrCredit,S.cpp,S.balances,S.rent]);
+  if (WR_CACHE.k===key) return WR_CACHE.h;
+  WR_CACHE.h=walletReviewBuild(); WR_CACHE.k=key; return WR_CACHE.h;
+}
+function walletReviewBuild(){
   var db=wrDB(); if (!Object.keys(db).length || !S.cards.length) return '';
   var cf=(S.wrCredit==null?0.5:S.wrCredit), W=wrSpend(), sp=W.sp;
   var held=S.cards.map(function(c){ return wrCardModel(c,true); });
@@ -1499,7 +1514,7 @@ function walletReview(){
 
   // ---- Render ----
   var h='<div class="card" id="wallet-review"><h2>Card recommendations</h2>';
-  h+='<p class="sub" style="margin:0 0 10px">Based on '+(W.sample?'a typical household\'s spending (log some purchases to make this yours)':'your logged spending, scaled to a full year ('+money(Object.keys(sp).reduce(function(s,k){return s+sp[k];},0))+')')+', with each card used where it earns most.</p>';
+  h+='<p class="sub" style="margin:0 0 10px">'+(W.sample?'Based on a typical household (log purchases to make it yours).':'Based on your spending over a full year ('+money(Object.keys(sp).reduce(function(s,k){return s+sp[k];},0))+'), each purchase on its best card.')+'</p>';
   h+='<div class="kpis"><div class="kpi"><b>'+money(base.earn.tot)+'</b><span>rewards a year if each purchase goes on the right card</span></div><div class="kpi"><b>'+money(base.extras)+'</b><span>credits & perks you\'d use</span></div><div class="kpi"><b>'+money(base.fees)+'</b><span>annual fees</span></div><div class="kpi"><b>'+money(base.net)+'</b><span>net value of your wallet</span></div></div>';
   h+='<div class="row" style="margin:10px 0 4px;align-items:center"><span class="sub" style="margin:0;flex:none">Credits I\'d actually use</span></div><div class="seg" style="margin-bottom:12px">'+[[0,'None'],[0.5,'About half'],[1,'All']].map(function(o){return '<button data-act="wrc" data-v="'+o[0]+'"'+(cf===o[0]?' class="on"':'')+'>'+o[1]+'</button>';}).join('')+'</div>';
 
@@ -1517,14 +1532,14 @@ function walletReview(){
     if (m.brandOnly) why.push('Its higher rate on its own brand\'s '+Object.keys(m.brandOnly).map(function(k){return WR_CAT_NAME[k];}).join(' and ')+' isn\'t counted.');
     if (WR_ROTATE[m.id]) why.push(WR_ROTATE[m.id]+' are counted at about $120 a year if you activate each quarter.');
     if (WR_MEMBER[m.id]) why.push(WR_MEMBER[m.id][1]+'.');
-    h+=tipHTML([esc(m.name), why.join(' '), (r.marg>=0?'+':'−')+money(Math.abs(r.marg))+'/yr', chip[1]]);
+    h+=tipHTML([esc(m.name), why[0]+(why.length>1?wrMore('More',why.slice(1).join(' ')):''), (r.marg>=0?'+':'−')+money(Math.abs(r.marg))+'/yr', chip[1]]);
   });
-  h+='<p class="hint" style="margin-top:2px">The amount is what your wallet would lose each year without that card, after its fee.</p>';
+  h+='<p class="hint" style="margin-top:2px">Amount = what you\'d lose each year without the card, after its fee.</p>';
 
   if (overlap.length){
     h+='<h3 style="margin:16px 0 6px">Overlap</h3>';
     overlap.forEach(function(o){ var m=o.m, r=rows.filter(function(x){return x.m.id===m.id;})[0];
-      h+=tipHTML([esc(m.name)+' is mostly covered', 'Your other cards already earn as much or more everywhere you spend'+(o.beat.length?' ('+esc(wrList(o.beat))+')':'')+'.'+(r&&r.pooled?' It still matters because it unlocks transfers for your other '+(CUR[m.currency]||'points')+'.':'')+(m.fee===0?' With no fee, keeping it open still helps your credit: it adds to your total limit and your account age. Put one small bill on it so it isn\'t closed for inactivity.':''), '']); });
+      h+=tipHTML([esc(m.name)+' is mostly covered', 'Your other cards earn as much or more everywhere you spend.'+(r&&r.pooled?' Keep it: it makes your other '+(CUR[m.currency]||'points')+' transferable.':'')+(m.fee===0?' No fee, so keep it open for your credit and use it now and then.':''), '']); });
   }
 
   if (drops.length){
@@ -1539,7 +1554,7 @@ function walletReview(){
       if (dg && m.fee>0) t.push('Better than closing: ask '+m.issuer+' to product-change it to the '+dg.x.name+(dg.x.fee?' ('+money(dg.x.fee)+' fee)':' (no annual fee)')+'. You keep the account\'s age and limit, and there\'s no hard inquiry.');
       if (!dg && m.fee>0) t.push('Better than closing: ask '+m.issuer+' whether it has a no-annual-fee version of this card you can switch to. That keeps the account open with no hard inquiry.');
       if (m.fee===0) t.push('With no fee, keeping it open costs nothing and helps your credit, so closing it rarely makes sense.');
-      h+=tipHTML([(m.fee>0?'Downgrade or close ':'Keep, but rarely use ')+esc(m.name), t.join(' ')+wrMore('How closing affects your credit',wrCreditNote(m)), (r.marg<0?'+':'−')+money(Math.abs(r.marg))+'/yr', r.marg<0?'':'w']);
+      h+=tipHTML([(m.fee>0?'Downgrade or close ':'Keep, but rarely use ')+esc(m.name), t[0]+(t.length>1?wrMore('Details',t.slice(1).join(' ')):'')+wrMore('How closing affects your credit',wrCreditNote(m)), (r.marg<0?'+':'−')+money(Math.abs(r.marg))+'/yr', r.marg<0?'':'w']);
     });
   }
 
@@ -1561,7 +1576,7 @@ function walletReview(){
     if (WR_MEMBER[x.id]) t.push(WR_MEMBER[x.id][1]+'.');
     if (ex.face>(x.fee||0) && a.gain0<0) t.push('Most of its value is credits: if you wouldn\'t use them, it costs about '+money(-a.gain0)+' a year. Count only credits that replace spending you\'d do anyway.');
     t.push('Welcome bonuses aren\'t counted, so year one is usually better.');
-    h+=tipHTML(['Add '+esc(x.name), t.join(' ')+wrMore('How applying affects your credit',wrAddNote(x,held)), '+'+money(a.gain)+'/yr']); });
+    h+=tipHTML(['Add '+esc(x.name), t[0]+(t.length>1?wrMore('Details',t.slice(1).join(' ')):'')+wrMore('How applying affects your credit',wrAddNote(x,held)), '+'+money(a.gain)+'/yr']); });
   if (!hasBilt && S.rent>0) h+=tipHTML(['You pay rent: look at Bilt', 'Bilt cards can earn points on rent with no fee from Bilt, and they transfer to Hyatt, United, Alaska and more. Rent isn\'t counted in the numbers above.', '']);
 
   if (cTop.length){
@@ -1571,7 +1586,7 @@ function walletReview(){
       c.out.forEach(function(m){ var bal=(S.balances&&S.balances[m.currency])||0; if (bal>0 && m.currency!=='cash' && !held.some(function(o){return c.out.indexOf(o)<0&&o.currency===m.currency;})) lost.push('your '+Math.round(bal).toLocaleString()+' '+(CUR[m.currency]||'points')+' unless you use or transfer them first'); });
       h+=tipHTML(['Swap '+wrList(names)+' for the '+esc(c.x.name), (lost.length?'You\'d give up '+wrList(lost)+'. ':'')+'One '+esc(c.x.name)+(cats.length?' (your best card for '+wrList(cats)+')':'')+' does more for you than '+(c.out.length>1?'those two together':names[0])+', even after fees ('+money(c.x.fee||0)+' versus '+money(c.fees)+' now). Downgrade rather than close where you can, to keep the accounts\' age and limits.'+wrMore('How this affects your credit',wrAddNote(c.x,held)+' '+wrCreditNote(c.out[0]).replace(/^It\'s a charge card[^.]*\. /,'')), '+'+money(c.gain)+'/yr']); });
   }
-  h+='<p class="foot">Assumes you use each card where it earns most. Points are valued at your settings ('+(S.cpp&&S.cpp.amex||1.3)+'¢ for bank points); Chase and Citi points from no-fee cards count as cash back unless you hold a Sapphire, Ink Preferred or Strata Premier/Elite. Rent, portal bookings and welcome bonuses aren\'t included. Credit-score effects vary by person and scoring model. General information, not financial advice.</p>';
+  h+='<p class="foot">Excludes rent, portal bookings and welcome bonuses. Chase and Citi points from no-fee cards count as cash back without a Sapphire, Ink Preferred or Strata Premier/Elite. '+howtoLink('tips','More on how this works')+' General information, not financial advice.</p>';
   h+='</div>';
   return h;
 }
@@ -1688,7 +1703,7 @@ function portalCard(){
   var h='<div class="card" id="portals"><div class="phead"><h2>Shopping portals</h2><button class="mini" data-pact="fold">'+(fold?'Expand':'Collapse')+'</button></div>';
   var src=Object.keys(PORTALS).filter(function(k){return S.portals[k];}).map(function(k){ var d=portalAge(k); return PORTALS[k]+' · '+(d===0?'today':d===1?'yesterday':d+'d ago'); });
   if (fold){ h+='<p class="sub" style="margin:0">'+all.length+' stores · best '+(Math.round(all[0].tot*10)/10)+'¢ per $ at '+esc(all[0].it.m)+'. '+src.join(' · ')+'</p></div>'; return h; }
-  h+='<p class="sub" style="margin:0 0 6px">To max out: open the store through the portal, add the card offer if there is one, then pay with the card shown. All three stack. '+src.join(' · ')+'.</p>';
+  h+='<p class="sub" style="margin:0 0 6px">Start at the portal, add any card offer, pay with the card shown. '+src.join(' · ')+' · '+howtoLink('portals')+'</p>';
   var stale=Object.keys(PORTALS).filter(function(k){ var d=portalAge(k); return d!=null&&d>=7; });
   if (stale.length) h+='<div class="note">Boosted rates change every few days. Tap the Grab offers bookmark on '+stale.map(function(k){return PORTALS[k];}).join(' and ')+' again to refresh.</div>';
   if (all.length>4 && PORTAL_ALL) h+='<button class="btn ghost wide" data-pact="all" style="margin:4px 0 6px">Show top 4</button>';
@@ -1703,7 +1718,7 @@ function portalCard(){
   });
   if (all.length>4) h+='<button class="btn ghost wide" data-pact="all" id="portalmore">'+(PORTAL_ALL?'Show top 4':'Show all '+all.length)+'</button>';
   if (S.portals.rakuten) h+='<div class="row" style="margin-top:8px;align-items:center"><span class="sub" style="margin:0;flex:1">Rakuten pays you in</span><div class="seg" style="flex:none">'+[['cash','Cash'],['amex','Amex points']].map(function(o){ return '<button data-pact="pay" data-v="'+o[0]+'"'+((S.portalPay||'cash')===o[0]?' class="on"':'')+'>'+o[1]+'</button>'; }).join('')+'</div></div>';
-  h+='<p class="foot">Total = portal reward + your best card\'s rewards for that store, in cents per $1 at your point values (Rove miles at '+((S.cpp&&S.cpp.rove)||1.2)+'¢). Card offers are extra on top.</p></div>';
+  h+='<p class="foot">Total = portal + card rewards per $1 at your point values (Rove miles '+((S.cpp&&S.cpp.rove)||1.2)+'¢). Card offers add on top.</p></div>';
   return h;
 }
 
@@ -1739,6 +1754,68 @@ document.addEventListener('input',function(e){
   var pc=document.getElementById('portals'); if(pc) pc.style.display=(w.length&&!any)?'none':'';
   var pm=document.getElementById('portalmore'); if(pm) pm.style.display=w.length?'none':'';
 });
+
+// ---- How-to page (Settings → How to use) and small shared UI helpers ----
+function isPublic(){ return typeof PUBLIC!=='undefined' && PUBLIC; }
+function howtoTopics(){
+  var pub=isPublic(), G=typeof GRAB_URL!=='undefined'?GRAB_URL:'#';
+  var t=[
+    ['pick','Pay: at the register','<p>Tap what you\'re buying and use the card at the top. Rankings count earning rates <b>and</b> benefits like primary rental car coverage, trip delay insurance, phone protection and foreign transaction fees.</p><p>Tap <b>Details</b> on any card to see the math, or read "Why not…" under the top pick.</p>'],
+    ['travel','Travel: booking a trip','<p>Fill in from, to, dates, cabin and stops, then search. You\'ll see paying cash with your best card, booking through a card\'s travel site, and transferring points to an airline, ranked by real cost.</p><p>Award prices are estimates. Find the actual seat on the airline\'s site before transferring points, because transfers can\'t be undone.</p>'],
+    ['offers','Offers: card-linked deals','<p>Install the <a class="link" href="'+G+'" target="_blank" rel="noopener">Grab offers bookmark</a> once. On your bank\'s offers page (in Safari, not the bank\'s app), tap it, tap <b>Copy for Card Playbook</b>, then in Offers tap <b>Paste offers from your bank</b>.</p><p>Do it about once a week per card. Offers still have to be added to your card in the bank\'s app before you buy. <b>Email deals</b> collects promo codes and points offers from your inbox.</p>'],
+    ['portals','Shopping portals: Rakuten and Rove','<p>Tap the same bookmark on Rakuten\'s <b>Double Cash Back</b> page or Rove\'s shopping page, then paste in Offers. The <b>Shopping portals</b> list shows the best stores, the card to pay with, and the total you\'d earn.</p><p>To max out a purchase: open the store through the portal, add any card offer for that store, then pay with the card shown. All three stack. Boosted rates change every few days, so grab again before a big purchase.</p>'],
+    ['wallet','Wallet: cards, credits and points','<p><b>Cards</b> shows what each card has earned this year against its fee. Use <b>+ Add a card</b> to pick from the card list and <b>Remove a card</b> to take one off. <b>Edit</b> fixes rates, caps, fees and rotating 5% categories.</p><p><b>Credits</b> lists every statement credit; tap one when used. Checks clear on their own when the period resets.</p><p><b>Points</b> holds your balances, live transfer bonuses and where each currency transfers.</p>'],
+    ['purchases','Purchases and due dates','<p>'+(pub?'Connect Gmail in Settings and turn on $0 purchase alerts in each card\'s app. Purchases from those emails are logged for you.':'Purchases are read from your card\'s alert emails every evening. Turn on email alerts for every purchase ($0 minimum) in each card\'s app.')+' Open <b>Recent purchases</b> on the Cards page to fix a category or remove a refund.</p><p><b>Due dates</b> sorts your cards by next statement close. The balance on the closing date is what gets reported, so pay down a few days before it to keep utilization low.</p>'],
+    ['bilt','Bilt: rent and Rent Day','<p>Shows points earned this statement from rent and purchases, your tier, and how much more to spend to reach the next one. Rent Day (the 1st) doubles points on purchases.</p>'],
+    ['tips','Insights','<p>Split into <b>Overview</b> (your year), <b>Cards</b> (tips and which cards to keep, drop or add), <b>Budget</b> and <b>Credit</b>.</p><p>Card recommendations assume you use each card where it earns most. Credit-score notes explain how closing or opening a card affects utilization, account age and inquiries. General information, not financial advice.</p>'],
+    ['sync', pub?'Backups and new phones':'Syncing between versions', pub?'<p>Everything is saved only on this phone. Clearing Safari\'s website data or deleting the Home Screen icon erases it. Settings → <b>Copy data</b> makes a backup code; save it in Notes, and paste it under <b>Import</b> on a new phone.</p>':'<p>The Claude version and your phone version keep separate data. Settings → <b>Copy data</b> on one, then <b>Import</b> on the other. Whichever you import into is overwritten, so log mostly on one.</p><p>Transfer bonuses, email deals and Gmail purchases refresh on their own and reach your phone each evening.</p>'],
+    ['look','Make it yours','<p>Settings → <b>Appearance</b> changes the accent color and moves the tab bar if something covers it.</p>']
+  ];
+  return t;
+}
+var HOWTO_OPEN='';
+function viewHowto(){
+  var h='<div class="row" style="margin:0 0 10px"><button class="btn ghost" data-tab="sync" style="flex:none">‹ Settings</button></div>';
+  h+='<div class="card"><h2>How to use Card Playbook</h2><p class="sub" style="margin:0">Use the right card for each purchase, use every credit and offer, and know whether each card is worth its fee.</p></div>';
+  h+=howtoTopics().map(function(g){ return '<details class="gd-s"'+(HOWTO_OPEN===g[0]?' open':'')+' id="ht-'+g[0]+'"><summary>'+g[1]+'</summary><div class="gd-b">'+g[2]+'</div></details>'; }).join('');
+  if (typeof tourOpen==='function') h+='<button class="btn ghost wide" data-tour="open" style="margin-top:12px">Replay the quick tour</button>';
+  return h;
+}
+function howtoLink(topic,label){ return '<button class="link htl" data-howto="'+topic+'">'+(label||'How it works')+'</button>'; }
+function guideOpen(){ HOWTO_OPEN=''; tab='howto'; render(); window.scrollTo(0,0); }
+// Collapsible "show more" for long lists, without re-rendering.
+function moreBtn(group,n,label){ return '<button class="btn ghost wide" data-more="'+group+'">'+(label||('Show '+n+' more'))+'</button>'; }
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-howto],[data-more],[data-gd],[data-isec]'); if(!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (b.dataset.howto){ HOWTO_OPEN=b.dataset.howto; tab='howto'; render(); var el=document.getElementById('ht-'+HOWTO_OPEN); if(el) el.scrollIntoView(); else window.scrollTo(0,0); return; }
+  if (b.dataset.gd){ if(b.dataset.gd==='open') guideOpen(); return; }
+  if (b.dataset.more){ document.querySelectorAll('[data-mg="'+b.dataset.more+'"]').forEach(function(x){ x.style.display=''; }); b.remove(); return; }
+  if (b.dataset.isec){ INS_TAB=b.dataset.isec; document.querySelectorAll('[data-isec-sec]').forEach(function(x){ x.style.display=x.getAttribute('data-isec-sec')===INS_TAB?'':'none'; }); document.querySelectorAll('[data-isec]').forEach(function(x){ x.classList.toggle('on',x.dataset.isec===INS_TAB); }); window.scrollTo(0,0); }
+}, true);
+// Lazy "Value breakdown" on card pages: built when opened.
+document.addEventListener('toggle',function(e){
+  var d=e.target; if(!d||!d.dataset||!d.dataset.vt||!d.open||d.dataset.done) return;
+  var c=cardById(d.dataset.vt); if(!c) return; d.dataset.done='1'; d.insertAdjacentHTML('beforeend', valueTracker(c));
+}, true);
+// Insights: split one long page into four short sections.
+var INS_TAB='overview';
+var INS_SEC=[['overview','Overview'],['cards','Cards'],['money','Budget'],['credit','Credit']];
+var INS_MAP=[[/credit score|credit/i,'credit'],[/maximize|recommendation|annual fee|offer|card/i,'cards'],[/budget|subscription|saving|bills?/i,'money']];
+function insightsSplit(html){
+  var box=document.createElement('div'); box.innerHTML=html; var have={};
+  Array.prototype.slice.call(box.children).forEach(function(el){
+    if (el.classList.contains('foot')) return;
+    var h2=el.querySelector('h2'), t=h2?h2.textContent:'', s='overview';
+    for (var i=0;i<INS_MAP.length;i++) if (INS_MAP[i][0].test(t)){ s=INS_MAP[i][1]; break; }
+    el.setAttribute('data-isec-sec',s); have[s]=1;
+  });
+  var avail=INS_SEC.filter(function(x){return have[x[0]];});
+  if (avail.length<2) return html;
+  if (!have[INS_TAB]) INS_TAB=avail[0][0];
+  Array.prototype.slice.call(box.querySelectorAll('[data-isec-sec]')).forEach(function(el){ if(el.getAttribute('data-isec-sec')!==INS_TAB) el.style.display='none'; });
+  return '<div class="seg isec">'+avail.map(function(x){ return '<button data-isec="'+x[0]+'"'+(x[0]===INS_TAB?' class="on"':'')+'>'+x[1]+'</button>'; }).join('')+'</div>'+box.innerHTML;
+}
 
 /*__PRIV__*/
 
@@ -1962,10 +2039,12 @@ function liveCard(q, r){
   var card=feeCard(), h='<div class="card"><h2>Live fares <span class="live">Expedia · '+new Date(L.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</span></h2>';
   if (!L.timeMatched) h+='<p class="hint" style="margin:0 0 6px">Nothing matched your time of day, so these are the cheapest at any time.</p>';
   L.flights.forEach(function(f,i){
+    var hide=i>=3;
     function line(x,lbl){ return x?'<div class="lf-l"><span>'+lbl+'</span>'+esc(x.dep)+' → '+esc(x.arr)+(x.plus?' <sup>+'+x.plus+'</sup>':'')+' · '+(x.stops?x.stops+' stop'+(x.stops>1?'s':'')+(x.via&&x.via.length?' ('+esc(x.via.join(', '))+')':''):'Nonstop')+' · '+esc(x.dur||'')+'</div>':''; }
-    h+='<div class="lf'+(i===0?' best':'')+'"><div class="lf-h"><b>'+esc(f.airline)+'</b><span class="amt">'+money(f.price)+'</span></div>'+line(f.out,'Out')+line(f.back,'Back')
+    h+='<div class="lf'+(i===0?' best':'')+'"'+(hide?' data-mg="fares" style="display:none"':'')+'><div class="lf-h"><b>'+esc(f.airline)+'</b><span class="amt">'+money(f.price)+'</span></div>'+line(f.out,'Out')+line(f.back,'Back')
       +'<div class="to-f">'+(i===0?'<span class="pill ok">Cheapest</span>':'')+(f.seats&&f.seats<=4?'<span class="pill warn">'+f.seats+' seats left</span>':'')+(f.fare?'<span class="pill">'+esc(f.fare.charAt(0)+f.fare.slice(1).toLowerCase())+' fare</span>':'')+(f.refundable?'<span class="pill">Refundable</span>':'')+'</div></div>';
   });
+  if (L.flights.length>3) h+=moreBtn('fares',L.flights.length-3,'Show '+(L.flights.length-3)+' more fares');
   h+='<div class="to-a" style="margin-top:10px"><a class="mini" href="'+esc(expUrl(q,r))+'" target="_blank" rel="noopener">Book on Expedia</a><a class="mini" href="'+esc(gfUrl(q))+'" target="_blank" rel="noopener">Compare on Google Flights</a></div>';
   h+='<p class="hint" style="margin:8px 0 0">Total for '+Math.max(1,+q.pax||1)+' traveler'+(+q.pax>1?'s':'')+', taxes included. Pay with '+esc(card.name)+'. Booking on the airline\'s own site instead of Expedia keeps elite perks and makes changes easier.</p>';
   return h+'</div>';
@@ -2017,7 +2096,7 @@ function walletSummary(){
 }
 function viewCards(){
   cardDBHydrate();
-  var h=walletBar()+walletSummary()+statementCard()+txCard();
+  var h=walletBar()+walletSummary()+'<div class="stack2">'+statementCard()+txCard()+'</div>';
   S.cards.forEach(function(c){
     h+='<div class="card cwrap">'+cardFace(c);
     Object.keys(c.caps||{}).forEach(function(k){
@@ -2025,7 +2104,7 @@ function viewCards(){
       var lbl=(CATS.filter(function(x){return x[0]===k;})[0]||[k,k])[1];
       h+=meter(lbl+' cap', S.spent[c.id+':'+k]||0, cap.limit);
     });
-    h+=earnedBlock(c)+'<details class="earn vt"><summary>Value breakdown<span></span></summary>'+valueTracker(c)+'</details>';
+    h+=earnedBlock(c)+'<details class="earn vt" data-vt="'+c.id+'"><summary>Value breakdown<span></span></summary></details>';
     h+='</div>';
   });
   h+=''+foundersSection();
@@ -2109,12 +2188,11 @@ function bestRoute(p, routes){
 
 function inboxCard(){
   var recent = INBOX.updates.filter(function(u){ return u.type!=='txn'; }).slice(-6).reverse();
-  var h='<div class="card"><h2>Gmail sync log</h2>';
-  if (!INBOX.asOf) return h+'<p class="why" style="margin:0">Waiting for the first Gmail sync.</p></div>';
-  h+='<p class="sub" style="margin:0 0 6px">Last checked '+fmtDate(INBOX.asOf)+'.</p>';
+  if (!INBOX.asOf) return '<div class="card"><h2>Gmail sync</h2><p class="why" style="margin:0">Waiting for the first Gmail sync.</p></div>';
+  var h='<details class="card more"><summary>Gmail sync<span class="sumr">checked '+fmtDate(INBOX.asOf)+'</span></summary>';
   if (!recent.length) h+='<p class="why" style="margin:0">Nothing new found yet.</p>';
   recent.forEach(function(u){ h+='<div class="sub" style="padding:4px 0">• '+esc(u.label||u.type)+(u.asOf?' <span style="opacity:.7">('+fmtDate(u.asOf)+')</span>':'')+'</div>'; });
-  return h+'</div>';
+  return h+'</details>';
 }
 
 // ---- Transfer calculator (not saved; just for quick math) ----
@@ -2139,11 +2217,12 @@ function viewPoints(){
   h+='<div class="note '+(age<=7?'ok':'')+'">'+(age<=7?'Transfer data updated '+asOfLabel()+'.':'Transfer data is '+age+' days old (from '+asOfLabel()+').')+(MODE==='local'?' Import from the Claude version to get the latest.':' It refreshes automatically twice a week.')+'</div>';
   h+='<div class="card"><h2>Transfer bonuses now</h2>';
   if (!live.length) h+='<p class="why" style="margin:0">No bonuses on file for your points. Transfer only when you\'ve found award space.</p>';
-  live.forEach(function(b){
+  live.forEach(function(b,bi){
     var mine=S.programs.indexOf(b.to)>=0, br=baseRatio(b.from,b.to);
-    h+='<div class="credit" style="cursor:default"><div class="ctext"><b>'+SHORT[b.from]+' → '+PARTNERS[b.to].n+(mine?' ★':'')+(isNew('points',bonusKey(b))?rdot():'')+'</b><small>+'+b.pct+'% · '+fmtRatio(br.r)+' becomes '+fmtRatio(br.r*(1+b.pct/100))+' · ends '+fmtDate(b.ends)+'</small><div class="calcrow">'+calcInput('b:'+b.from+':'+b.to, 'Points')+calcOut('b:'+b.from+':'+b.to, br.r*(1+b.pct/100), unitFor(b.to))+'</div></div><div class="amt">'+daysLeft(b.ends)+'d</div></div>';
+    h+='<div class="credit" style="cursor:default'+(bi>=5?';display:none':'')+'"'+(bi>=5?' data-mg="bonus"':'')+'><div class="ctext"><b>'+SHORT[b.from]+' → '+PARTNERS[b.to].n+(mine?' ★':'')+(isNew('points',bonusKey(b))?rdot():'')+'</b><small>+'+b.pct+'% · '+fmtRatio(br.r)+' becomes '+fmtRatio(br.r*(1+b.pct/100))+' · ends '+fmtDate(b.ends)+'</small><div class="calcrow">'+calcInput('b:'+b.from+':'+b.to, 'Points')+calcOut('b:'+b.from+':'+b.to, br.r*(1+b.pct/100), unitFor(b.to))+'</div></div><div class="amt">'+daysLeft(b.ends)+'d</div></div>';
   });
-  h+='<p class="sub" style="margin:8px 0 0">★ = one of your programs. Bonuses as of '+asOfLabel()+'; expired ones drop off automatically.</p></div>';
+  if (live.length>5) h+=moreBtn('bonus',live.length-5,'Show '+(live.length-5)+' more bonuses');
+  h+='<p class="sub" style="margin:8px 0 0">★ = one of your programs.</p></div>';
   h+=viewAllianceRoutes();
 
   h+='<div class="card"><div class="chead"><h2 style="margin:0">Your airlines &amp; hotels</h2><button class="link" data-tab="programs">Choose</button></div>';
@@ -2212,7 +2291,7 @@ function offerText(o){
   if (o.spend) t+=' on $'+(+o.spend).toLocaleString()+'+';
   return t;
 }
-var OFFER_Q = '', OFFER_PAGE = 30;
+var OFFER_Q = '', OFFER_PAGE = 30, OFFER_FULL = false;
 var OFFER_CATS = [
  ['Dining','dining restaurants restaurant food coffee',/shake shack|mcdonald|chick-fil|taco bell|wendy|burger king|panera|bojangles|jack in the box|dunkin|chang|lazy dog|barcelona wine|cracker barrel|little caesars|nepali|grubhub|doordash|ezcater|chuck e|tiff's|levain|peet|blue bottle|la colombe|starbucks/],
  ['Grocery','grocery groceries food delivery meal',/whole foods|trader joe|aldi|instacart|hungryroot|home chef|blue apron|misfits|daily harvest|fresh meal|nurture life|trifecta|omaha steaks|wild alaskan|sam's club|walmart|target|nuts\.com|huel|ag1/],
@@ -2238,7 +2317,7 @@ function applyOfferQ(){
   var mb=document.getElementById('offermore'); if (mb) mb.style.display=words.length?'none':'';
   var n=document.getElementById('offerqn'); if(n) n.textContent = words.length ? (shown ? shown+' of '+total+' offers match' : 'No offers match "'+OFFER_Q+'"') : '';
 }
-document.addEventListener('input', function(e){ if (e.target && e.target.id==='offerq') { OFFER_Q=e.target.value; applyOfferQ(); } });
+document.addEventListener('input', function(e){ if (e.target && e.target.id==='offerq') { OFFER_Q=e.target.value; if (OFFER_Q && !OFFER_FULL){ OFFER_FULL=true; var y=window.scrollY; render(); window.scrollTo(0,y); var q=document.getElementById('offerq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } } applyOfferQ(); } });
 function viewOffers(){
   S.offers = S.offers || [];
   var t=todayStr();
@@ -2258,7 +2337,6 @@ function viewOffers(){
   var nNew=live.filter(function(o){ return isNew('offers',o.id); }).length;
   if (nNew) h+='<div class="note new">'+rdot()+' '+nNew+' new offer'+(nNew===1?'':'s')+' since you last looked, listed first.</div>';
   if (notAdded) h+='<div class="note">'+notAdded+' not added to a card yet. Add them in the card\'s app before you buy.</div>';
-  h+='<p class="hint">Ranked by estimated value.</p>';
   h+=offerPasteBlock()+'<details class="more"><summary>More ways to add offers</summary>';
   if (SAMPLE) {
     h+='<p class="why" style="margin:0 0 10px">Screenshot the offers list in your card\'s app (Amex Offers, Chase Offers, Capital One Offers, Bilt) and upload it, or screen-record yourself scrolling through the whole list and upload the video. Claude reads the offers and adds them here.</p>';
@@ -2274,6 +2352,7 @@ function viewOffers(){
   if (!live.length) h+='<div class="card"><p class="why" style="margin:0">No active offers yet.</p></div>';
   else h+='<div class="card list">';
   live.forEach(function(o,i){
+    if (i>=OFFER_PAGE && !OFFER_FULL) return;
     var c=cardById(o.card), v=offerValue(o), dl=o.ends?daysLeft(o.ends):null, ret=o.spend?Math.round(v/o.spend*100):null;
     h+='<div class="ofr'+(i>=OFFER_PAGE?' lz':'')+'" data-os="'+esc(offerSearchText(o))+(isNew('offers',o.id)?' new':'')+'" style="--k:'+(CARD_TINT[o.card]||'var(--accent)')+'"><div class="ofr-m"><div class="ofr-t"><b>'+esc(o.merchant)+(isNew('offers',o.id)?rdot():'')+'</b><span class="amt">'+(v?money(v):'')+'</span></div>';
     h+='<div class="ofr-s"><i class="cdot"></i>'+esc(c?c.name:'Card')+' · '+esc(offerText(o))+(ret?' · '+ret+'%':'')+'</div>';
@@ -2468,14 +2547,12 @@ function parseCode(txt){
 function viewSync(){
   var other = MODE==='local' ? 'the version in Claude' : 'your phone version';
   var np=S.navPos||'bottom';
-  var h=themeCard()+'<div class="card"><h2>Tab bar</h2><div class="segs"><button data-navpos="bottom" class="'+(np==='bottom'?'on':'')+'">Bottom</button><button data-navpos="raised" class="'+(np==='raised'?'on':'')+'">Bottom, raised</button><button data-navpos="top" class="'+(np==='top'?'on':'')+'">Top</button></div><p class="hint">If the Claude app covers the bottom of your screen, use "Bottom, raised" to lift the tabs above it.</p></div>';
-  h+=inboxCard()+'<div class="card"><h2>Copy data</h2><p class="why" style="margin:0 0 12px">Copy a code with your cards, totals and checks, then paste it into '+other+' under Import.</p>';
-  h+='<button class="btn" data-act="copy" style="width:100%">Copy data</button>';
-  h+='<textarea id="outcode" readonly style="display:none">'+exportCode()+'</textarea></div>';
-  h+='<div class="card"><h2>Import</h2><p class="why" style="margin:0 0 12px">Paste a code from '+other+'. This replaces everything here.</p>';
-  h+='<textarea id="incode" placeholder="Paste code (starts with CP1.)"></textarea>';
-  h+='<div id="confirm"></div><button class="btn" data-act="import" style="width:100%;margin-top:10px">Import</button></div>';
-  h+='<p class="foot">Sync is manual: whichever version you import into is overwritten. Log mostly on one, and sync now and then.</p>';
+  var h='<button class="card htcard" data-gd="open"><span><b>How to use Card Playbook</b><small>Every tab, offers and portals setup, syncing</small></span><i>›</i></button>';
+  h+=themeCard().replace('<h2>Accent color</h2>','<h2>Appearance</h2>').replace(/<\/div>$/,'')+'<div class="seglbl">Tab bar</div><div class="segs"><button data-navpos="bottom" class="'+(np==='bottom'?'on':'')+'">Bottom</button><button data-navpos="raised" class="'+(np==='raised'?'on':'')+'">Raised</button><button data-navpos="top" class="'+(np==='top'?'on':'')+'">Top</button></div><p class="hint">Use Raised if something covers the tabs at the bottom.</p></div>';
+  h+=inboxCard();
+  h+='<div class="card"><h2>'+(isPublic()?'Backup':'Move data')+'</h2><p class="why" style="margin:0 0 12px">'+(isPublic()?'Copy a backup code and keep it in Notes. Paste it under Import on a new phone.':'Copy a code here, then paste it into '+other+' under Import.')+'</p>';
+  h+='<button class="btn" data-act="copy" style="width:100%">Copy data</button><textarea id="outcode" readonly style="display:none"></textarea>';
+  h+='<details class="more imp"><summary>Import</summary><p class="why" style="margin:8px 0 10px">Paste a code from '+other+'. This replaces everything here.</p><textarea id="incode" placeholder="Paste code (starts with CP1.)"></textarea><div id="confirm"></div><button class="btn" data-act="import" style="width:100%;margin-top:10px">Import</button></details></div>';
   return h;
 }
 
@@ -2621,6 +2698,7 @@ function themeCard(){
   return '<div class="card"><h2>Accent color</h2><div class="swatches">'+THEME_ORDER.map(function(k){ var th=THEMES[k]; return '<button data-theme="'+k+'" class="sw'+(k===cur?' on':'')+'" style="--a:'+themeHex('#34d399',th)+';--b:'+themeHex('#047857',th)+'"><i></i><span>'+th.n+'</span></button>'; }).join('')+'</div><p class="hint">Changes buttons, highlights, bars and the background tint. Card faces, category colors and gold details stay the same.</p></div>';
 }
 function render(){
+  RSEQ++;
   if (THEME_ON!==(S.theme||'purple')) applyTheme();
   if (LAST_TAB!==null && TAB_SEC[LAST_TAB] && TAB_SEC[LAST_TAB]!==TAB_SEC[tab]) commitSeen(TAB_SEC[LAST_TAB]);
   LAST_TAB=tab;
@@ -2631,7 +2709,7 @@ function render(){
   h+='<nav class="tabbar">'+GROUPS.map(function(gr){ var on=g&&g.k===gr.k; var dot=gr.tabs.some(function(tb){ return TAB_SEC[tb]&&newCount(TAB_SEC[tb]); }); return '<button data-tab="'+(GROUP_LAST[gr.k]||gr.tabs[0])+'" class="'+(on?'on':'')+'"><span class="ti">'+ICON[gr.k]+(dot?rdot():'')+'</span><span class="tl">'+gr.label+'</span></button>'; }).join('')+'</nav>';
   if (g && g.subs) h+='<div class="seg">'+g.subs.map(function(sb){ var on=(GROUP_LAST[g.k]===sb[0]); var dot=TAB_SEC[sb[0]]&&newCount(TAB_SEC[sb[0]]); return '<button data-tab="'+sb[0]+'" class="'+(on?'on':'')+'">'+sb[1]+(dot?rdot():'')+'</button>'; }).join('')+'</div>';
   h+='<main class="view'+(prevTab!==tab&&prevTab!==null?' enter':'')+'">';
-  h+= tab==='pick'?viewPick(): tab==='bilt'?viewBilt(): tab==='cards'?viewCards(): tab==='edit'?viewEdit(): tab==='points'?viewPoints(): tab==='programs'?viewPrograms(): tab==='offers'?viewOffers(): tab==='email'?viewEmail(): tab==='offeradd'?viewOfferAdd(): tab==='sync'?viewSync(): tab==='tips'?viewSuggestions(): tab==='travel'?viewTravel(): viewCredits();
+  h+= tab==='pick'?viewPick(): tab==='bilt'?viewBilt(): tab==='cards'?viewCards(): tab==='edit'?viewEdit(): tab==='points'?viewPoints(): tab==='programs'?viewPrograms(): tab==='offers'?viewOffers(): tab==='email'?viewEmail(): tab==='offeradd'?viewOfferAdd(): tab==='sync'?viewSync(): tab==='tips'?insightsSplit(viewSuggestions()): tab==='howto'?viewHowto(): tab==='travel'?viewTravel(): viewCredits();
   h+='</main>';
   var np=navPosNow(); document.body.classList.toggle('nav-top',np==='top'); document.body.classList.toggle('nav-raised',np==='raised');
   document.getElementById('app').innerHTML=h;
@@ -2784,7 +2862,7 @@ document.addEventListener('click',function(e){
     else if(act==='offerall'){ OFFER_PAGE=100000; var oy=window.scrollY; render(); window.scrollTo(0,oy); }
     else if(act==='newcycle'){S.bilt={spend:0,txns:0}; var cyn=biltCycle(); S.biltCycleStart=cyn?cyn.start:todayStr(); BILT_CLOSED=null;toast('Statement reset');changed();}
     else if(act==='copy'){
-      var code=exportCode(), out=document.getElementById('outcode');
+      var code=exportCode(), out=document.getElementById('outcode'); out.value=code;
       var showBox=function(){out.style.display='block';out.focus();out.select();toast('Select all and copy');};
       try { navigator.clipboard.writeText(code).then(function(){toast('Copied');},showBox); } catch(err){ showBox(); }
     }
@@ -2876,7 +2954,7 @@ function offerPasteBlock(){
     h+='<div class="row"><button class="btn" data-act="opaste" style="flex:1">Paste offers from your bank</button></div>';
     if (OP.txt) h+='<textarea id="optext" placeholder="Paste the code from the Grab offers bookmark (starts with CPO1.)"></textarea><div class="row"><button class="btn ghost" data-act="optext" style="flex:1">Read code</button></div>';
     if (OP.msg) h+='<div class="note">'+esc(OP.msg)+'</div>';
-    h+='<p class="hint" style="margin:8px 0 0">Tap the <a class="link" href="'+GRAB_URL+'" target="_blank" rel="noopener">Grab offers bookmark</a> on your Amex, Chase, Capital One or Citi offers page, or on Rakuten or Rove. It reads every offer or store rate and copies the list for here.</p>';
+    h+='<p class="hint" style="margin:8px 0 0">Use the <a class="link" href="'+GRAB_URL+'" target="_blank" rel="noopener">Grab offers bookmark</a> on your bank\'s offers page, Rakuten or Rove. '+howtoLink('offers')+'</p>';
   }
   return h+'</div>';
 }

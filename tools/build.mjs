@@ -81,13 +81,11 @@ console.log('index.html', html.length, 'bytes');
     ["+foundersSection();", "+(fcOn()?foundersSection():'');"],
     ["if (FC_TIP[cat])", "if (fcOn() && FC_TIP[cat])"],
     ["'<nav class=\"tabbar\">'+GROUPS.map(", "'<nav class=\"tabbar\">'+GROUPS.filter(navGroupOn).map("],
-    ["h+=inboxCard()+", "h+=gmailCard()+"],
+    ["  h+=inboxCard();", "  h+=gmailCard();"],
     ["var other = MODE==='local' ? 'the version in Claude' : 'your phone version';", "var other = 'another phone or browser';"],
     [" Searches work in the Claude version of this app; here the button opens Googl", " The button opens Googl"],
     ["' Import from the Claude version to get the latest.'", "' New data arrives with app updates.'"],
-    ["If the Claude app covers the bottom of your screen", "If something covers the bottom of your screen"],
     ["h+=offerPasteBlock()+", "h+=(!(S.offers||[]).length?offersTutorial():'')+offerPasteBlock()+"],
-    ["From purchase alert emails, every evening.", "From your card alert emails when you tap Sync Gmail in Settings."],
   ];
   for (const [a, b] of rep) {
     if (!pm.includes(a)) { console.warn('public patch skipped (not found): ' + a.slice(0, 60)); continue; }

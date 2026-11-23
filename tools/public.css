@@ -25,12 +25,6 @@ nav.tabbar{grid-auto-flow:column;grid-template-columns:none!important;grid-auto-
 .tr-body p{margin:0 0 8px;color:#cfdcd5;font-size:14.5px;line-height:1.5}.tr-body b{color:#fff}
 .tr-dots{display:flex;gap:6px;justify-content:center;margin:12px 0 4px}.tr-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.2)}.tr-dots i.on{background:#34d399;width:18px;border-radius:4px}
 .gd .pk-list{padding-bottom:10px}
-details.gd-s{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025);margin-bottom:8px}
-details.gd-s>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
-details.gd-s>summary::-webkit-details-marker{display:none}
-details.gd-s>summary::after{content:"";width:7px;height:7px;border:solid #9cb6aa;border-width:0 1.8px 1.8px 0;transform:rotate(45deg);transition:transform .2s}
-details.gd-s[open]>summary::after{transform:rotate(-135deg)}
-.gd-b{padding:0 14px 12px;color:#cfdcd5;font-size:14px;line-height:1.55}.gd-b p{margin:0 0 8px}.gd-b b{color:#fff}
 .card.su .su-h{display:flex;justify-content:space-between;align-items:center}.su-n{font-size:12px;font-weight:700;color:#9ff5d0}
 .su-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;font-size:14px;color:#e2ebe6;background:none;border:0;border-top:1px solid var(--line);padding:10px 2px;cursor:pointer}
 .su-row:first-of-type{border-top:0}.su-row span:nth-child(2){flex:1}

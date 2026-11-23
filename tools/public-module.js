@@ -3,17 +3,7 @@ var CARD_DB={}, CFG={};
 try{ CFG=JSON.parse((document.getElementById('cfg')||{}).textContent||'{}'); }catch(e){}
 function applyCardDB(){
   try{ (JSON.parse(document.getElementById('carddb').textContent).cards||[]).forEach(function(x){ CARD_DB[x.id]=x; }); }catch(e){}
-  S.cards.forEach(function(c){
-    var x=CARD_DB[c.id]; if(!x) return;
-    if(!FACES[c.id] && x.face) FACES[c.id]=x.face;
-    if(!CARD_TINT[c.id] && x.tint) CARD_TINT[c.id]=x.tint;
-    if(x.metal) METAL[c.id]=1;
-    if(DEFAULT_FEE[c.id]==null && x.fee) DEFAULT_FEE[c.id]=x.fee;
-    if(!PERKS[c.id] && x.perks) PERKS[c.id]=x.perks;
-    if(x.credits && !CREDITS.some(function(cr){ return cr.card===c.id; })) x.credits.forEach(function(cr,i){ CREDITS.push({id:c.id+'-'+i, card:c.id, name:cr.name, amt:cr.amt, per:cr.per, how:cr.how||''}); });
-    if(x.curName && !CUR[c.currency]) CUR[c.currency]=x.curName;
-    if(S.cpp[c.currency]==null) S.cpp[c.currency]=x.cpp||1;
-  });
+  cardDBHydrate();
 }
 function fcOn(){ return !!(S.fc || (S.subs||[]).some(function(s){ return s.id==='founderscard'; })); }
 function navGroupOn(gr){ return gr.k!=='bilt' || !!rentCard(); }
@@ -157,31 +147,6 @@ document.addEventListener('click',function(e){
   else if(a==='next'){ if(TOUR_I>=TOUR.length-1) tourClose(); else { TOUR_I++; document.getElementById('tourov').innerHTML=tourHtml(); } }
   else tourClose();
 }, true);
-var GUIDE=[
-  ['The idea in one line','<p>Use the right card for each purchase, use every credit and offer, and know if each card is worth its fee.</p>'],
-  ['Install it like an app','<p>In Safari, tap <b>Share → Add to Home Screen</b>, then open Card Playbook from the icon. You get a full-screen app with the tabs fixed at the bottom.</p><p>Your data stays in whichever copy you use (the icon and Safari keep separate data), so pick one and stick with it.</p>'],
-  ['Pay: at the register','<p>Tap the category (Restaurants, Groceries, Gas, Flights, Car rentals, Abroad…). Use the card at the top.</p><p>Rankings count earning rates <b>and</b> benefits: primary rental car coverage, trip delay insurance, cell phone protection, and foreign transaction fees. Tap <b>Details</b> to see the math, or read "Why not…" under the top pick.</p><p>Some stores are special. Walmart and Target usually don\'t count as groceries, and Costco only takes Visa.</p>'],
-  ['Travel: booking a trip','<p>Fill in from, to, dates, cabin and stops, then tap search. You\'ll see three kinds of options: pay cash with your best card, book through your card\'s travel site, or transfer points to an airline.</p><p>Prices are estimates. Before transferring points, find the actual award seat on the airline\'s site, because transfers can\'t be undone.</p><p>Paying in another currency? Use a card with no foreign transaction fee.</p>'],
-  ['Offers: card-linked deals','<p>Set up the <a class="link" href="'+GRAB_URL+'" target="_blank" rel="noopener">Grab offers bookmark</a> once. Then, on your bank\'s offers page, tap it, tap <b>Copy for Card Playbook</b>, and in the Offers tab tap <b>Paste offers from your bank</b>.</p><p>Do it about once a week per card. Offers still have to be added to your card in the bank\'s app or website before you buy. After using one, tap <b>Used</b>.</p>'],
-  ['Wallet: Cards','<p>Each card shows its earning rates, what it has earned you this year, and its value against the annual fee.</p><p>Use <b>+ Add a card</b> and <b>Remove a card</b> at the top of Wallet to change which cards you carry. Tap <b>Edit</b> to fix anything: earning rates, caps, annual fee, or rotating 5% categories (Freedom Flex, Discover, Custom Cash, Cash+). Tap <b>Add a card</b> to search for more.</p>'],
-  ['Wallet: Credits','<p>Every statement credit your cards come with, grouped by when it resets. Tap one to check it off when used. Checks clear on their own when a new month, quarter, half-year or year starts.</p>'],
-  ['Wallet: Points','<p>Enter your points and miles balances to see what they\'re worth and where they transfer. Update them whenever you check your bank app.</p>'],
-  ['Gmail sync: purchases logged for you','<p><b>Step 1:</b> In each card\'s app, turn on an email alert for every purchase (set the minimum to $0). Look under Alerts or Notifications.</p><p><b>Step 2:</b> Gear → <b>Gmail sync</b> → <b>Connect Gmail</b>. Google will say the app isn\'t verified; tap Continue.</p><p><b>Step 3:</b> Tap <b>Sync Gmail now</b> whenever you like. Purchases appear under Wallet → Cards → Synced purchases. Fix a category with its menu, and remove refunds with ×.</p><p>It reads only purchase alerts, right on your phone. Gmail access is invite-only for now; ask whoever shared the app to add your email.</p>'],
-  ['Insights','<p>Tips based on what you actually spend, like which card to move a bill to, unused credits, and fees that may not be worth it.</p>'],
-  ['Backups and new phones','<p>Everything is saved only on this phone. Clearing Safari\'s website data, or deleting the Home Screen icon, erases it.</p><p>Gear → <b>Copy data</b> makes a backup code; save it in Notes. On a new phone, paste it under <b>Import</b>.</p>'],
-  ['Make it yours','<p>Gear → <b>Accent color</b> changes the look. <b>Tab bar</b> moves the tabs if something covers them.</p>']
-];
-function guideOpen(){
-  var ov=document.createElement('div'); ov.className='pk-ov'; ov.id='guideov';
-  ov.innerHTML='<div class="pk gd"><div class="pk-h"><b>How to use Card Playbook</b><button class="mini x" data-gd="x">Close</button></div><div class="pk-list">'+
-    GUIDE.map(function(g,i){ return '<details class="gd-s"'+(i<2?' open':'')+'><summary>'+g[0]+'</summary><div class="gd-b">'+g[1]+'</div></details>'; }).join('')+
-    '<button class="btn ghost wide" data-tour="open" style="margin-top:12px">Replay the quick tour</button></div></div>';
-  document.body.appendChild(ov); document.body.classList.add('pk-open');
-}
-document.addEventListener('click',function(e){
-  var b=e.target.closest('[data-gd]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); if(b.dataset.gd==='open') guideOpen(); else { var o=document.getElementById('guideov'); if(o) o.remove(); document.body.classList.remove('pk-open'); } return; }
-  if(e.target.closest('#guideov [data-tour="open"]')){ var o2=document.getElementById('guideov'); if(o2) o2.remove(); document.body.classList.remove('pk-open'); }
-}, true);
 // Setup checklist on Pay
 function setupItems(){
   S.setup=S.setup||{};
@@ -219,7 +184,6 @@ document.addEventListener('click',function(e){
   else if(a==='credits'){ S.setup.credits=1; changed(); tab='credits'; render(); window.scrollTo(0,0); }
 }, true);
 var _viewPick=viewPick; viewPick=function(){ return setupCard()+_viewPick(); };
-var _viewSync=viewSync; viewSync=function(){ return '<div class="card"><h2>Help</h2><p class="why" style="margin:0 0 10px">A full guide to every tab, plus Gmail and offers setup.</p><div class="row" style="margin:0"><button class="btn" data-gd="open" style="flex:1">How to use Card Playbook</button><button class="btn ghost" data-tour="open">Quick tour</button></div></div>'+_viewSync(); };
 if(S.onboarded && !S.tourDone) setTimeout(tourOpen, 600);
 // ===== Insights for anyone (replaces the personal version) =====
 var CAT_LABEL={dining:'dining',grocery:'groceries',gas:'gas',costco:'Costco',superstore:'Target and Walmart',flights:'flights',hotels:'hotels',cars:'car rentals',drugstore:'drugstores',streaming:'streaming',phone:'phone bills',abroad:'purchases abroad',other:'everything else'};

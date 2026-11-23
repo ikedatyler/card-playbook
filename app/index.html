@@ -3014,7 +3014,7 @@ function opImport(){
     if (o.added) x.added=true;
     return x;
   });
-  S.offers=keep.concat(add);
+  S.offers=keep.concat(add); S.offersAt=S.offersAt||{}; S.offersAt[card]=new Date().toISOString();
   var name=(cardById(card)||{}).name||'your card';
   OP.p=null; OP.txt=false; OP.msg='';
   changed(); render(); toast('Imported '+add.length+' offers for '+name);

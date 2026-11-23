@@ -52,8 +52,15 @@
     var meta={}; try{ meta=JSON.parse(localStorage.getItem(SYNC)||'{}'); }catch(e){}
     var local=localStorage.getItem(LS), r=o.remote, synced=false;
     if(r&&r.state&&(!meta.at||r.at>meta.at)){
-      var keep={}; try{ var l=JSON.parse(local||'null'); if(l){ ['theme','navPos'].forEach(function(k){ if(l[k]!=null) keep[k]=l[k]; }); } }catch(e){}
-      var st=r.state; for(var k in keep) st[k]=keep[k];
+      var st=r.state;
+      // Keep what was set on this phone: look settings, and anything imported here more recently than the synced copy.
+      try{ var l=JSON.parse(local||'null'); if(l){
+        ['theme','navPos','portalPay','portalFold','wrCredit'].forEach(function(k){ if(l[k]!=null) st[k]=l[k]; });
+        if(l.portals){ st.portals=st.portals||{}; Object.keys(l.portals).forEach(function(p){ var a=l.portals[p], b=st.portals[p]; if(a&&(!b||String(a.at||'')>String(b.at||''))) st.portals[p]=a; }); }
+        var la=l.offersAt||{}, ra=st.offersAt||{};
+        Object.keys(la).forEach(function(c){ if(!ra[c]||la[c]>ra[c]){ st.offers=(st.offers||[]).filter(function(o){return o.card!==c;}).concat((l.offers||[]).filter(function(o){return o.card===c;})); ra[c]=la[c]; } });
+        st.offersAt=ra;
+      } }catch(e){}
       try{
         localStorage.setItem(LS,JSON.stringify(st));
         localStorage.setItem(EXTRA,JSON.stringify({transfers:r.transfers||null,inbox:r.inbox||null,emailoffers:r.emailoffers||null,priv:r.priv||''}));

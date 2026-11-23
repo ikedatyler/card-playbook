@@ -1731,11 +1731,13 @@ function portalClean(m){
 }
 var PORTAL_CAT=[[/hotels?\b|expedia|booking\.com|priceline|vrbo|airbnb|marriott|hilton|hyatt|ihg|wyndham|agoda|trip\.com/i,'hotels'],[/airlines?|airways|united|delta|southwest|jetblue|alaska air|frontier|spirit|flights?/i,'flights'],[/hertz|avis|budget|enterprise|national car|sixt|turo|car rental/i,'cars'],[/doordash|uber eats|grubhub|postmates|seamless/i,'dining'],[/instacart|safeway|whole foods|kroger|albertsons/i,'grocery'],[/walmart|target/i,'superstore'],[/cvs|walgreens|rite aid/i,'drugstore']];
 function portalCatOf(m){ for(var i=0;i<PORTAL_CAT.length;i++) if(PORTAL_CAT[i][0].test(m)) return PORTAL_CAT[i][1]; return 'other'; }
+function pNorm(x){ return String(x||'').toLowerCase().replace(/\.com\b/g,'').replace(/&/g,'and').replace(/[^a-z0-9]/g,''); }
+function pMatch(a,b){ a=pNorm(a); b=pNorm(b); if(a.length<3||b.length<3) return a===b&&a.length>0; return a.indexOf(b)>=0||b.indexOf(a)>=0; }
 function portalCardFor(m, cache){
   var k=portalCatOf(m);
   if (!(k in cache)) cache[k]=(typeof ranked==='function'?ranked(k):[]).filter(function(x){return x.ok;});
   var list=cache[k], best=list[0]?{card:list[0].card, val:list[0].val}:null, t=todayStr(), ml=m.toLowerCase();
-  var off=(S.offers||[]).filter(function(o){ if(o.used||(o.ends&&o.ends<t)) return false; var om=String(o.merchant||'').toLowerCase(); return om&&(om.indexOf(ml)>=0||ml.indexOf(om)>=0); })
+  var off=(S.offers||[]).filter(function(o){ if(o.used||(o.ends&&o.ends<t)) return false; if(OFFER_CARD&&o.card!==OFFER_CARD) return false; return pMatch(o.merchant,m); })
     .sort(function(a,b){ return offerValue(b)-offerValue(a); })[0];
   var use=best;
   if (off){ var oc=list.filter(function(x){return x.card.id===off.card;})[0]; use=oc?{card:oc.card, val:oc.val}:{card:cardById(off.card), val:0}; }
@@ -1743,8 +1745,11 @@ function portalCardFor(m, cache){
 }
 function portalCard(){
   var all=portalItems(); if(!all.length) return '';
+  var cname=OFFER_CARD?((cardById(OFFER_CARD)||{}).name||'this card'):'';
+  if (OFFER_CARD) all=all.filter(function(r){ return r.pay.offer; });
+  if (OFFER_CARD && !all.length) return '<div class="card" id="portals"><div class="phead"><h2>Shopping portals</h2></div><p class="sub" style="margin:0">No Rakuten or Rove stores match '+esc(cname)+' offers right now. Tap All to see every store.</p></div>';
   var fold=!!S.portalFold;
-  var h='<div class="card" id="portals"><div class="phead"><h2>Shopping portals</h2><button class="mini" data-pact="fold">'+(fold?'Expand':'Collapse')+'</button></div>';
+  var h='<div class="card" id="portals"><div class="phead"><h2>Shopping portals'+(OFFER_CARD?' · '+esc(cname):'')+'</h2><button class="mini" data-pact="fold">'+(fold?'Expand':'Collapse')+'</button></div>';
   var src=Object.keys(PORTALS).filter(function(k){return S.portals[k];}).map(function(k){ var d=portalAge(k); return PORTALS[k]+' · '+(d===0?'today':d===1?'yesterday':d+'d ago'); });
   if (fold){ h+='<p class="sub" style="margin:0">'+all.length+' stores · best '+(Math.round(all[0].tot*10)/10)+'¢ per $ at '+esc(all[0].it.m)+'. '+src.join(' · ')+'</p></div>'; return h; }
   h+='<p class="sub" style="margin:0 0 6px">Start at the portal, add any card offer, pay with the card shown. '+src.join(' · ')+' · '+howtoLink('portals')+'</p>';

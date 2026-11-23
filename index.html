@@ -2754,7 +2754,7 @@ document.addEventListener('click',function(e){
     if(i>=0) S.programs.splice(i,1); else S.programs.push(pk);
     var y=window.scrollY; changed(); window.scrollTo(0,y); return;
   }
-  if(b.dataset.tab){e.preventDefault();tab=b.dataset.tab;editId=null;render();}
+  if(b.dataset.tab){e.preventDefault();tab=b.dataset.tab;editId=null;render();window.scrollTo(0,0);var se=document.scrollingElement;if(se)se.scrollTop=0;}
   else if(b.dataset.cat){cat=b.dataset.cat;selCard=null;render();}
   else if(b.dataset.sel){selCard=b.dataset.sel;var keep=(document.getElementById('amt')||{}).value;render();var a=document.getElementById('amt');if(a&&keep)a.value=keep;}
   else if(b.dataset.edit){editId=b.dataset.edit;tab='edit';render();window.scrollTo(0,0);}

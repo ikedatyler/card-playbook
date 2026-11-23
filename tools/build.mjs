@@ -215,6 +215,10 @@ const pkPath = path.join(root, 'pubkey.json');
 if (!fs.existsSync(pkPath)) { console.log('No pubkey.json yet: skipped data.enc.json'); process.exit(0); }
 const jwk = JSON.parse(fs.readFileSync(pkPath, 'utf8'));
 const pub = await wc.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RSA-OAEP-256', ext: true }, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+const body = { state: JSON.parse(state), transfers: JSON.parse(transfers), inbox: inboxM ? JSON.parse(inboxM[1]) : null, emailoffers: emailM ? JSON.parse(emailM[1]) : null, priv: PRIV };
+// Skip re-encrypting when the data hasn't changed, so code-only updates don't make phones re-sync.
+const fp = (await import('node:crypto')).createHash('sha256').update(jwk.n + JSON.stringify(body)).digest('hex').slice(0, 16);
+try { const old = JSON.parse(fs.readFileSync(path.join(root, 'data.enc.json'), 'utf8')); if (old.h === fp) { console.log('data.enc.json unchanged'); process.exit(0); } } catch (e) {}
 const payload = JSON.stringify({
   at: new Date().toISOString(),
   state: JSON.parse(state),
@@ -229,5 +233,5 @@ const wrapped = await wc.subtle.encrypt({ name: 'RSA-OAEP' }, pub, raw);
 const iv = wc.getRandomValues(new Uint8Array(12));
 const ct = await wc.subtle.encrypt({ name: 'AES-GCM', iv }, aes, new TextEncoder().encode(payload));
 const b64u = b => Buffer.from(b).toString('base64url');
-fs.writeFileSync(path.join(root, 'data.enc.json'), JSON.stringify({ v: 1, alg: 'RSA-OAEP-256+A256GCM', key: b64u(wrapped), iv: b64u(iv), ct: b64u(ct) }));
+fs.writeFileSync(path.join(root, 'data.enc.json'), JSON.stringify({ v: 1, alg: 'RSA-OAEP-256+A256GCM', h: fp, key: b64u(wrapped), iv: b64u(iv), ct: b64u(ct) }));
 console.log('data.enc.json', payload.length, 'bytes of data encrypted');

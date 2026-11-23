@@ -834,7 +834,18 @@ function migrate(d){
 }
 
 var S = migrate(JSON.parse(document.getElementById('state').textContent));
-if (MODE === 'local') { try { var saved = localStorage.getItem(LS_KEY); if (saved) S = migrate(JSON.parse(saved)); } catch(e) {} }
+if (MODE === 'local') { try { var saved = localStorage.getItem(LS_KEY); if (saved) S = migrate(JSON.parse(saved)); } catch(e) {} mineLoad(); }
+// Things imported on this phone (portal rates, pasted offers) are also kept under their own key, so a sync from the Claude version can't wipe them.
+function mineSave(){ if (MODE!=='local') return; try{ var at=S.offersAt||{}; localStorage.setItem('cardplaybook-mine', JSON.stringify({portals:S.portals||{}, portalPay:S.portalPay, portalFold:S.portalFold, wrCredit:S.wrCredit, offersAt:at, offers:(S.offers||[]).filter(function(x){ return at[x.card]; })})); }catch(e){} }
+function mineLoad(){
+  try{ var o=JSON.parse(localStorage.getItem('cardplaybook-mine')||'null'); if(!o) return;
+    ['portalPay','portalFold','wrCredit'].forEach(function(k){ if(o[k]!=null && S[k]==null) S[k]=o[k]; });
+    S.portals=S.portals||{}; Object.keys(o.portals||{}).forEach(function(p){ var a=o.portals[p], b=S.portals[p]; if(a&&(!b||String(a.at||'')>String(b.at||''))) S.portals[p]=a; });
+    var ra=S.offersAt||{}, oa=o.offersAt||{};
+    Object.keys(oa).forEach(function(c){ if(!ra[c]||oa[c]>ra[c]){ S.offers=(S.offers||[]).filter(function(x){return x.card!==c;}).concat((o.offers||[]).filter(function(x){return x.card===c;})); ra[c]=oa[c]; } });
+    S.offersAt=ra;
+  }catch(e){}
+}
 if (S.year !== Y) { S.year = Y; S.spent = {}; S.creditCount = {}; S.benefits = {}; S.reported = {}; }
 // ---- Updates found in Gmail by the scheduled sync (each applied once) ----
 var INBOX = {asOf:'', updates:[]};
@@ -1721,7 +1732,7 @@ function portalRate(k,it){
   if (k==='rakuten') return S.portalPay==='amex' ? it.pct+'x Amex points' : it.pct+'% cash back';
   return it.unit==='pct' ? it.pct+'% back' : it.pct+'x Rove miles';
 }
-function portalAge(k){ var p=(S.portals||{})[k]; if(!p||!p.at) return null; return Math.floor((Date.now()-new Date(p.at))/864e5); }
+function portalAge(k){ var p=(S.portals||{})[k]; if(!p||!p.at) return null; return Math.max(0,Math.floor((Date.now()-new Date(p.at))/864e5)); }
 function portalClean(m){
   m=String(m||'').replace(/\s+/g,' ').trim();
   m=m.replace(/^(find out more at|shop at|shop now at|visit|go to|earn (?:cash back|points) at)\s+/i,'');
@@ -2785,6 +2796,7 @@ function buildDoc(){
 function changed(skipRender){
   if (MODE === 'local'){
     try { localStorage.setItem(LS_KEY, JSON.stringify(S)); saveState='saved'; } catch(e){ saveState='error'; }
+    mineSave();
     if(!skipRender) render(); return;
   }
   if (!artifact){ if(!skipRender) render(); return; }

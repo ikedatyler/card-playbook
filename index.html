@@ -530,6 +530,15 @@ nav.tabbar button.on svg{color:#9ff5d0;filter:drop-shadow(0 0 9px rgba(52,211,15
 .addtx b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .addtx small{opacity:.7;font-size:12px}
 .addgo{flex:none;font-size:13px;font-weight:600;color:#6ee7b7}
+
+#portals .prow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07)}
+#portals .prow-m{flex:1;min-width:0;display:flex;flex-direction:column}
+#portals .prow-m b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#portals .prow-m small{font-size:12px;opacity:.75}
+#portals .prow-m s{opacity:.7}
+#portals .prow-v{flex:none;text-align:right;font-weight:700;font-size:15px;line-height:1.1}
+#portals .prow-v small{display:block;font-size:10px;font-weight:500;opacity:.65}
+#portals .prow-v.hot{color:#6ee7b7}
 </style>
 </head>
 <body>
@@ -1632,6 +1641,75 @@ document.addEventListener('click',function(e){
   }
 }, true);
 
+// ---- Shopping portals (Rakuten, Rove): boosted store rates, read by the Grab offers bookmark ----
+var PORTALS={rakuten:'Rakuten', rove:'Rove'}, PORTAL_ALL=false;
+function portalItems(){
+  var out=[]; S.portals=S.portals||{};
+  Object.keys(PORTALS).forEach(function(k){ var p=S.portals[k]; if(!p) return; (p.items||[]).forEach(function(it){ out.push({p:k, it:it, v:portalVal(k,it)}); }); });
+  var rk=function(r){ return r.v*(r.it.upto?0.5:1)*(r.it.was?1.15:1); }; // 'up to' rates rarely apply in full
+  return out.sort(function(a,b){ return rk(b)-rk(a); });
+}
+function portalVal(k,it){ // cents back per $1
+  if (k==='rakuten') return it.pct*(S.portalPay==='amex'?(S.cpp.amex||1.3):1);
+  if (it.unit==='pct') return it.pct;
+  return it.pct*((S.cpp&&S.cpp.rove)||1.2);
+}
+function portalRate(k,it){
+  if (k==='rakuten') return S.portalPay==='amex' ? it.pct+'x Amex points' : it.pct+'% cash back';
+  return it.unit==='pct' ? it.pct+'% back' : it.pct+'x Rove miles';
+}
+function portalAge(k){ var p=(S.portals||{})[k]; if(!p||!p.at) return null; return Math.floor((Date.now()-new Date(p.at))/864e5); }
+function portalCard(){
+  var all=portalItems(); if(!all.length) return '';
+  var h='<div class="card" id="portals"><h2>Shopping portals</h2>';
+  var src=Object.keys(PORTALS).filter(function(k){return S.portals[k];}).map(function(k){ var d=portalAge(k); return PORTALS[k]+' '+(S.portals[k].items||[]).length+' stores · '+(d===0?'today':d===1?'yesterday':d+'d ago'); });
+  h+='<p class="sub" style="margin:0 0 8px">'+src.join(' · ')+'. Start at the portal, then pay with your best card: portal rewards stack on top of your card\'s points and card offers.</p>';
+  var stale=Object.keys(PORTALS).filter(function(k){ var d=portalAge(k); return d!=null&&d>=7; });
+  if (stale.length) h+='<div class="note">Boosted rates change every few days. Tap the Grab offers bookmark on '+stale.map(function(k){return PORTALS[k];}).join(' and ')+' again to refresh.</div>';
+  var qw=String(typeof OFFER_Q!=='undefined'?OFFER_Q:'').toLowerCase().split(/\s+/).filter(Boolean);
+  all.forEach(function(r,i){
+    var it=r.it, top=i<4, st=(it.m+' '+PORTALS[r.p]).toLowerCase();
+    var show=qw.length? qw.every(function(x){return st.indexOf(x)>=0;}) : (top||PORTAL_ALL);
+    var u=r.p==='rakuten'?(S.portalPay==='amex'?'x':'%'):(it.unit==='pct'?'%':'x');
+    h+='<div class="prow'+(top?' top':'')+'" data-ps="'+esc(st)+'"'+(show?'':' style="display:none"')+'><div class="prow-m"><b>'+esc(it.m)+'</b><small>'+PORTALS[r.p]+' · '+esc((it.upto?'up to ':'')+portalRate(r.p,it))+(it.was?' <s>was '+it.was+u+'</s>':'')+'</small></div><span class="prow-v'+(it.was?' hot':'')+'">'+(Math.round(r.v*10)/10)+'¢<small>per $</small></span></div>';
+  });
+  if (all.length>4) h+='<button class="btn ghost wide" data-pact="all" id="portalmore">'+(PORTAL_ALL?'Show top 4':'Show all '+all.length)+'</button>';
+  if (S.portals.rakuten) h+='<div class="row" style="margin-top:8px;align-items:center"><span class="sub" style="margin:0;flex:1">Rakuten pays you in</span><div class="seg" style="flex:none">'+[['cash','Cash'],['amex','Amex points']].map(function(o){ return '<button data-pact="pay" data-v="'+o[0]+'"'+((S.portalPay||'cash')===o[0]?' class="on"':'')+'>'+o[1]+'</button>'; }).join('')+'</div></div>';
+  h+='<p class="foot">¢ per $ uses your point values (Rove miles at '+((S.cpp&&S.cpp.rove)||1.2)+'¢). Boosted stores, marked with the old rate, are listed first at equal value.</p></div>';
+  return h;
+}
+function portalPasteBlock(){
+  var p=OP.p, n=p.offers.length, nb=p.offers.filter(function(o){return o.was;}).length;
+  var h='<div class="opaste"><div class="note ok">Found '+n+' '+PORTALS[p.iss]+' store'+(n===1?'':'s')+(nb?' ('+nb+' boosted)':'')+'.</div>';
+  h+='<p class="hint" style="margin:6px 0 0">This replaces your '+PORTALS[p.iss]+' list, so ended boosts drop off.</p>';
+  h+='<div class="row"><button class="btn" data-act="opimport" style="flex:1">Import '+PORTALS[p.iss]+' rates</button><button class="btn ghost" data-act="opcancel">Cancel</button></div></div>';
+  return h;
+}
+function portalImport(){
+  var p=OP.p; S.portals=S.portals||{};
+  var seen={}, items=[];
+  p.offers.forEach(function(o){ var m=String(o.merchant||'').slice(0,60).trim(), r=+o.pct; if(!m||!(r>0)) return; var k=m.toLowerCase(); if(seen[k]&&seen[k].pct>=r) return;
+    var it={m:m, pct:r, unit:o.unit==='pct'?'pct':'x'}; if(p.iss==='rakuten') it.unit='pct'; if(+o.was>0&&+o.was<r) it.was=+o.was; if(o.upto) it.upto=1;
+    if(seen[k]) items[items.indexOf(seen[k])]=it; else items.push(it); seen[k]=it; });
+  S.portals[p.iss]={at:new Date().toISOString(), items:items.slice(0,500)};
+  OP.p=null; OP.txt=false; OP.msg='';
+  toast(PORTALS[p.iss]+': '+items.length+' stores imported'); changed();
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-pact]'); if(!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  var y=window.scrollY;
+  if (b.dataset.pact==='all'){ PORTAL_ALL=!PORTAL_ALL; render(); window.scrollTo(0,y); return; }
+  if (b.dataset.pact==='pay'){ S.portalPay=b.dataset.v; changed(); window.scrollTo(0,y); }
+}, true);
+document.addEventListener('input',function(e){
+  if (!e.target || e.target.id!=='offerq') return;
+  var w=e.target.value.toLowerCase().split(/\s+/).filter(Boolean), any=0;
+  document.querySelectorAll('[data-ps]').forEach(function(el){ var t=el.getAttribute('data-ps'), ok=w.length? w.every(function(x){return t.indexOf(x)>=0;}) : (PORTAL_ALL||el.classList.contains('top')); el.style.display=ok?'':'none'; if(ok) any++; });
+  var pc=document.getElementById('portals'); if(pc) pc.style.display=(w.length&&!any)?'none':'';
+  var pm=document.getElementById('portalmore'); if(pm) pm.style.display=w.length?'none':'';
+});
+
 /*__PRIV__*/
 
 // ---- Card faces: original designs in each card's color (not the issuers' artwork) ----
@@ -2162,6 +2240,7 @@ function viewOffers(){
   h+='<div class="toolbar"><div class="search">'+svgI('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/>')+'<input type="search" id="offerq" autocomplete="off" placeholder="Search stores or categories" value="'+esc(OFFER_Q)+'"></div>';
   if (cardsWith.length) h+='<div class="chips">'+chip('','All',allCount)+cardsWith.map(function(cd){ return chip(cd.id, cd.name, counts[cd.id]); }).join('')+'</div>';
   h+='<div id="offerqn" class="hint" style="margin:2px 4px 0;min-height:0"></div></div>';
+  h+=portalCard();
   if (!live.length) h+='<div class="card"><p class="why" style="margin:0">No active offers yet.</p></div>';
   else h+='<div class="card list">';
   live.forEach(function(o,i){
@@ -2755,6 +2834,7 @@ function opDecode(t){ var m=String(t||'').match(/CPO1\.([A-Za-z0-9_\-]+)/); if(!
 function opGuess(p){ var cs=S.cards.filter(function(c){ return issuerOf(c)===p.iss; }); if(!cs.length) return (S.cards[0]||{}).id||''; var h=(p.cardHint||'').toLowerCase(); var hit=cs.filter(function(c){ return c.name.toLowerCase().split(/\s+/).some(function(w){ return w.length>3 && !/^(card|rewards|visa|amex|chase|citi|capital|business)$/.test(w) && h.indexOf(w)>=0; }); })[0]; return (hit||cs[0]).id; }
 function hashStr(s){ var h=5381; for(var i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); }
 function offerPasteBlock(){
+  if (OP.p && PORTALS[OP.p.iss]) return portalPasteBlock();
   var h='<div class="opaste">';
   if (OP.p){
     var p=OP.p, g=opGuess(p), n=p.offers.length, na=p.offers.filter(function(o){return o.added;}).length;
@@ -2766,11 +2846,12 @@ function offerPasteBlock(){
     h+='<div class="row"><button class="btn" data-act="opaste" style="flex:1">Paste offers from your bank</button></div>';
     if (OP.txt) h+='<textarea id="optext" placeholder="Paste the code from the Grab offers bookmark (starts with CPO1.)"></textarea><div class="row"><button class="btn ghost" data-act="optext" style="flex:1">Read code</button></div>';
     if (OP.msg) h+='<div class="note">'+esc(OP.msg)+'</div>';
-    h+='<p class="hint" style="margin:8px 0 0">Tap the <a class="link" href="'+GRAB_URL+'" target="_blank" rel="noopener">Grab offers bookmark</a> on your Amex, Chase, Capital One or Citi offers page. It reads every offer and copies the list for here.</p>';
+    h+='<p class="hint" style="margin:8px 0 0">Tap the <a class="link" href="'+GRAB_URL+'" target="_blank" rel="noopener">Grab offers bookmark</a> on your Amex, Chase, Capital One or Citi offers page, or on Rakuten or Rove. It reads every offer or store rate and copies the list for here.</p>';
   }
   return h+'</div>';
 }
 function opImport(){
+  if (OP.p && PORTALS[OP.p.iss]) return portalImport();
   var p=OP.p, sel=document.getElementById('opcard'), card=sel?sel.value:opGuess(p); if(!p||!card) return;
   S.offers=S.offers||[];
   var used={}; S.offers.forEach(function(o){ if(o.card===card&&o.used) used[String(o.merchant).toLowerCase()]=1; });

@@ -159,7 +159,7 @@ textarea{width:100%;box-sizing:border-box;height:64px;background:#050b08;color:#
 details{margin-top:8px}summary{cursor:pointer;font-weight:600;color:#a7f3d0}
 </style></head><body><div class="w">
 <h1>Get your card offers</h1>
-<p class="sub">Card Playbook can pull in every Amex, Chase and Capital One offer with one tap of a bookmark. It only <b>reads</b> the offers page you have open: it doesn't add offers, change your account, or send your info anywhere. Set it up once (about 2 minutes), then use it whenever you want fresh offers.</p>
+<p class="sub">Card Playbook can pull in every Amex, Chase and Capital One offer, plus Rakuten and Rove store rates, with one tap of a bookmark. It only <b>reads</b> the offers page you have open: it doesn't add offers, change your account, or send your info anywhere. Set it up once (about 2 minutes), then use it whenever you want fresh offers.</p>
 
 <div class="c"><h2><i>1</i>Install the bookmark</h2>
 <h3>On iPhone or iPad (Safari)</h3><ol>
@@ -178,6 +178,8 @@ details{margin-top:8px}summary{cursor:pointer;font-weight:600;color:#a7f3d0}
 <p><span class="tag">Amex</span>Menu → <b>Offers</b>. Pick the card at the top if you have more than one. The bookmark skips the "Added to Card" row and reads the full list below it.</p>
 <p><span class="tag">Chase</span>Choose the card, then open <b>Chase Offers</b> (under the card's rewards, or "See all offers"). The page shows something like "148 results."</p>
 <p><span class="tag">Capital One</span>Open <b>Offers</b> from your card (it opens capitaloneoffers.com).</p>
+<p><span class="tag">Rakuten</span>Open rakuten.com in Safari and go to <b>Double Cash Back</b> (or any store list). The bookmark reads each store's rate and flags boosted ones (the ones showing "was").</p>
+<p><span class="tag">Rove</span>Open rovemiles.com in Safari and go to the <b>shopping</b> page with stores and miles per $. Same thing: it reads the rates, nothing else.</p>
 <p class="hint">Citi, Bank of America, U.S. Bank and Wells Fargo offer pages may work too.</p>
 </div>
 

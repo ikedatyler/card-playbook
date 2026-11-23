@@ -1,13 +1,14 @@
 (function(){
 if(window.__cpGrab){window.__cpGrab.remove();}
-var H=location.hostname, ISS=/americanexpress|aexp/.test(H)?'amex':/chase\.com/.test(H)?'chase':/capitalone/.test(H)?'c1':/citi/.test(H)?'citi':/bankofamerica/.test(H)?'boa':/usbank/.test(H)?'usb':/wellsfargo/.test(H)?'wf':'';
-var NAMES={amex:'Amex',chase:'Chase',c1:'Capital One',citi:'Citi',boa:'Bank of America',usb:'U.S. Bank',wf:'Wells Fargo'};
+var H=location.hostname, ISS=/americanexpress|aexp/.test(H)?'amex':/chase\.com/.test(H)?'chase':/capitalone/.test(H)?'c1':/citi/.test(H)?'citi':/bankofamerica/.test(H)?'boa':/usbank/.test(H)?'usb':/wellsfargo/.test(H)?'wf':/rakuten\.com/.test(H)?'rakuten':/rovemiles\.com|(^|\.)rove\.com/.test(H)?'rove':'';
+var PORTAL=ISS==='rakuten'||ISS==='rove';
+var NAMES={amex:'Amex',chase:'Chase',c1:'Capital One',citi:'Citi',boa:'Bank of America',usb:'U.S. Bank',wf:'Wells Fargo',rakuten:'Rakuten',rove:'Rove'};
 var box=document.createElement('div');window.__cpGrab=box;
 box.setAttribute('style','position:fixed;z-index:2147483647;left:12px;right:12px;bottom:12px;max-width:420px;margin:0 auto;background:#07120d;color:#eef3ef;border:1px solid #2f7a5c;border-radius:16px;padding:14px 16px;font:15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 18px 40px rgba(0,0,0,.5)');
 function btn(t,id,primary){return '<button id="'+id+'" style="flex:1;font:inherit;font-weight:600;padding:10px 8px;border-radius:10px;border:1px solid #2f7a5c;background:'+(primary?'#10b981':'transparent')+';color:'+(primary?'#04110b':'#a7f3d0')+'">'+t+'</button>';}
 function ui(msg,buttons){box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:16px">Card Playbook · Grab offers</b><button id="cpx" style="background:none;border:0;color:#9aa;font-size:20px">×</button></div><div id="cpm" style="color:#cfe0d8;font-size:14px">'+msg+'</div>'+(buttons?'<div style="display:flex;gap:8px;margin-top:10px">'+buttons+'</div>':'');box.querySelector('#cpx').onclick=function(){box.remove();};}
 document.body.appendChild(box);
-if(!ISS){ui('Open your card\'s offers page (Amex, Chase, Capital One, Citi, BofA, U.S. Bank or Wells Fargo) and tap this bookmark there.');return;}
+if(!ISS){ui('Open your card\'s offers page (Amex, Chase, Capital One, Citi, BofA, U.S. Bank or Wells Fargo), or Rakuten\'s or Rove\'s store list, and tap this bookmark there.');return;}
 var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
 var VAL=/\$\s?\d|\d+(\.\d+)?\s?%|\d[\d,]*\s*(bonus\s+)?(membership rewards\S*\s+)?(points|miles|pts)|\d+x\b|cash back/i;
 var ADDRE=/^(\+|add|add to card|add offer|add to list|activate|activate offer|enroll|save|save offer|add to my card)$/i;
@@ -43,12 +44,13 @@ async function collectAll2(){
   var stall=0;
   for(var i=0;i<600;i++){
     clickMore();
-    var grab=function(){scan().offers.forEach(function(o){var k=o.merchant.toLowerCase()+'|'+(o.amount||o.pct||o.note||'');if(!acc.has(k))acc.set(k,o);else if(o.added)acc.get(k).added=true;});};
+    var grab=function(){scan().offers.forEach(function(o){var k=o.merchant.toLowerCase()+(PORTAL?'':'|'+(o.amount||o.pct||o.note||''));if(!acc.has(k))acc.set(k,o);else if(o.added)acc.get(k).added=true;});};
     grab();
     var hs=ISS==='amex'?[]:deepAll(document.body).filter(function(el){if(!(el.scrollWidth>el.clientWidth+80&&el.clientWidth>150))return false;var r=el.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return false;return /(auto|scroll)/.test(getComputedStyle(el).overflowX)&&!el.__cpDone;});
     for(var h=0;h<hs.length;h++){var el=hs[h];el.__cpDone=1;for(var j=0;j<40&&el.scrollLeft<el.scrollWidth-el.clientWidth-2;j++){el.scrollLeft+=Math.max(120,el.clientWidth*0.8);await sleep(300);grab();}el.scrollLeft=0;}
     ui('Reading offers… '+acc.size+(target?' of '+target:'')+'. Keep this page open.');
     if(target&&acc.size>=target)break;
+    if(PORTAL&&acc.size>=500)break;
     var before=pos();step();await sleep(420);
     if(pos()<=before+2&&pos()>=max()-4){stall++;await sleep(900);if(stall>=4)break;}else stall=0;
   }
@@ -85,7 +87,7 @@ function parse(t,added){
   return o;
 }
 function skipRoots(){if(ISS!=='amex')return [];return deepAll(document.body).filter(function(e){return e.children.length<=2&&/^added to (your )?card\s*(\(\d+\))?$/i.test((e.textContent||'').trim())&&vis(e);}).map(function(h){var n=h;for(var i=0;i<8;i++){var q=up(n);if(!q||q===document.body)break;var r=q.getBoundingClientRect();if(r.height>1400)break;n=q;}return n;});}
-function scan(){var SK=skipRoots(),skip=function(t){return SK.some(function(r){return r.contains(t);});};
+function scan(){if(PORTAL)return pscan();var SK=skipRoots(),skip=function(t){return SK.some(function(r){return r.contains(t);});};
   var seen=new Set(),out=[],adds=[];
   controls().forEach(function(b){
     var a=isAdd(b),d=!a&&isDone(b);if(!a&&!d)return;
@@ -101,6 +103,31 @@ function scan(){var SK=skipRoots(),skip=function(t){return SK.some(function(r){r
   var k={};out=out.filter(function(o){var key=o.merchant+'|'+(o.amount||o.pct||o.note);if(k[key])return false;k[key]=1;return true;});
   return {offers:out,adds:adds};
 }
+
+// Shopping portals: each store tile shows a rate like "8% Cash Back", "Was 4%", "12x miles" or "12 miles/$".
+var PRATE=/(?:^|\s)(up to\s+)?(\d+(?:\.\d+)?)\s*(%|x\b|×|miles?\b|pts?\b|points?\b)/i;
+var PNOISE=/^(shop now|shop|see all|view all|details|terms|terms apply|exclusions apply|cash back|back|miles|per \$1?|\/\s*\$1?|new|featured|boosted|bonus|in-store|online|activate|add|favorite|hot deal|limited time|ends .*|expires .*)$/i;
+function pRateLeaf(e){ if(e.children.length>3) return false; var t=txt(e); if(!t||t.length>48) return false; return /\d/.test(t)&&(/%\s*(cash\s*back|back)?/i.test(t)||/\d\s*(x\b|×)/i.test(t)||/miles?\s*(\/|per)\s*\$/i.test(t)||/\d\s*(miles|pts|points)\b/i.test(t)); }
+function pTile(e){ var n=e,prev=null; for(var i=0;i<8&&n;i++){ n=up(n); if(!n||n===document.body) return prev; var t=parts(n), ls=t.split('\n').filter(Boolean); if(t.length>400) return prev; if(ls.filter(function(l){ return PRATE.test(l)&&!/^was\b/i.test(l); }).length>1) return prev; prev=n; if(ls.some(function(l){ return !PRATE.test(l)&&!/^was\b/i.test(l)&&!PNOISE.test(l)&&/[a-z]/i.test(l)&&l.length>=2&&l.length<=50; })||logoName(n)) return n; } return prev; }
+function pParse(t,T){
+  var ls=parts(t).split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  var all=ls.join(' '), was=null, m;
+  if((m=all.match(/\bwas\s+(?:up to\s+)?(\d+(?:\.\d+)?)\s*(%|x|×|miles?)/i))) was=+m[1];
+  var rl=ls.filter(function(l){ return !/^was\b/i.test(l)&&!/\bwas\s+\d/i.test(l)&&PRATE.test(l); })[0]||'';
+  var nowM=rl.match(/(up to\s+)?(\d+(?:\.\d+)?)\s*(%|x\b|×|miles?|pts?|points?)/i); if(!nowM) return null;
+  var name=ls.filter(function(l){ return l!==rl&&!PRATE.test(l)&&!/^was\b/i.test(l)&&!PNOISE.test(l)&&/[a-z]/i.test(l)&&l.length>=2&&l.length<=50; })[0]||logoName(T||t)||'';
+  name=name.replace(/\s*(logo|icon)$/i,'').trim(); if(!name) return null;
+  var o={merchant:name, pct:+nowM[2], unit:nowM[3]==='%'?'pct':'x'}; if(nowM[1]) o.upto=1; if(was&&was<o.pct) o.was=was; return o;
+}
+function pscan(){
+  var seen=new Set(), out=[];
+  deepAll(document.body).filter(function(e){ return vis(e)&&pRateLeaf(e); }).forEach(function(v){
+    var t=pTile(v); if(!t||seen.has(t)) return; var inside=false; seen.forEach(function(x){ if(x.contains(t)) inside=true; }); if(inside) return;
+    seen.add(t); var o=pParse(t,t); if(!o){ var q=up(t); if(q&&q!==document.body&&q.children.length<=4){ var lb=logoName(q); if(lb) o=pParse(lb+'\n'+parts(t),q); } } if(o) out.push(o);
+  });
+  var k={}; out=out.filter(function(o){ var key=o.merchant.toLowerCase(); if(k[key]) return false; k[key]=1; return true; });
+  return {offers:out, adds:[]};
+}
 function cardHint(){
   var t=(document.body.innerText||'').slice(0,4000);
   var m=t.match(/(Platinum|Gold|Green|Blue Cash \w+|Delta SkyMiles \w+|Hilton Honors \w*|Marriott Bonvoy \w+|Sapphire (?:Preferred|Reserve)|Freedom (?:Unlimited|Flex)|Prime Visa|Ink Business \w+|United \w+|Southwest \w+(?: \w+)?|Venture X|VentureOne|Venture|Savor|Quicksilver|Strata \w+|Double Cash|Custom Cash|Costco|AAdvantage \w+|Autograph(?: Journey)?|Active Cash|Customized Cash|Premium Rewards|Unlimited Cash|Altitude \w+|Cash\+)[^\n]{0,24}/i);
@@ -113,7 +140,7 @@ function code(offers){
 }
 function finish(offers,addedNow,target){
   var c=code(offers),n=offers.length,na=offers.filter(function(o){return o.added;}).length;
-  ui('Found '+n+' '+NAMES[ISS]+' offers'+(target&&n<target?' (the page says '+target+'; scroll the list once by hand and tap the bookmark again if any are missing)':'')+'. Tap Copy, then open Card Playbook → Offers → Paste offers from your bank.',btn('Copy for Card Playbook','cpc',1));
+  ui('Found '+n+' '+NAMES[ISS]+(PORTAL?' store rates':' offers')+(target&&n<target?' (the page says '+target+'; scroll the list once by hand and tap the bookmark again if any are missing)':'')+'. Tap Copy, then open Card Playbook → Offers → Paste offers from your bank.',btn('Copy for Card Playbook','cpc',1));
   var dbgb=document.createElement('button');dbgb.textContent='Something off? Copy troubleshooting details';dbgb.setAttribute('style','display:block;margin:10px auto 0;background:none;border:0;color:#9fb3aa;font:13px -apple-system,sans-serif;text-decoration:underline');box.appendChild(dbgb);
   dbgb.onclick=function(){var sc=scroller(),de=document.scrollingElement||document.documentElement;var d='CPDBG2 '+location.hostname+location.pathname+'\nfound='+n+' target='+(target||0)+' scroller='+(sc?(sc.tagName+'.'+(sc.className||'').toString().slice(0,40)+' h='+sc.scrollHeight):'window h='+de.scrollHeight)+' y='+(sc?sc.scrollTop:scrollY)+' skipRoots='+skipRoots().length+' vals='+valLeaves().length+'\nfirst: '+offers.slice(0,4).map(function(o){return o.merchant+' / '+(o.amount||o.pct||o.note||'');}).join(' | ')+'\nlast: '+offers.slice(-3).map(function(o){return o.merchant;}).join(' | ');(navigator.clipboard?navigator.clipboard.writeText(d):Promise.reject()).then(function(){dbgb.textContent='Copied. Send it to whoever shared Card Playbook with you.';}).catch(function(){var ta=document.createElement('textarea');ta.value=d;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();dbgb.textContent='Copied. Send it to whoever shared Card Playbook with you.';});};
   box.querySelector('#cpc').onclick=function(){
@@ -122,7 +149,7 @@ function finish(offers,addedNow,target){
   };
 }
 (async function(){
-  ui('Loading your '+NAMES[ISS]+' offers…');
+  ui(PORTAL?'Reading '+NAMES[ISS]+' store rates…':'Loading your '+NAMES[ISS]+' offers…');
   var r=await collectAll();
   if(!r.offers.length){ui('No offers found on this page. Make sure the offers list is showing, then tap the bookmark again. Still nothing? Tap the button and send the result to whoever shared Card Playbook with you so the bookmark can be fixed for this page.',btn('Copy troubleshooting details','cpd',1));box.querySelector('#cpd').onclick=function(){var v=valLeaves()[0]||deepAll(document.body).filter(function(e){return /cash back|% back|\$\d/.test(e.textContent||'')&&e.children.length<3;})[0];var t=v?(tileOfVal(v)||up(up(up(v)))):null;var h=t?t.outerHTML:'(no offer text found) '+deepAll(document.body).slice(0,400).map(function(e){return e.tagName.toLowerCase()+(e.shadowRoot?'#shadow':'');}).join(' ');h=h.replace(/<(svg|img|picture|source)[^>]*>[\s\S]*?<\/\1>|<img[^>]*>/gi,'<$1/>').replace(/\s(src|srcset|style|d)="[^"]*"/gi,'').slice(0,6000);var dbg='CPDBG '+location.hostname+location.pathname+' shadowHosts='+deepAll(document.body).filter(function(e){return e.shadowRoot;}).length+' vals='+valLeaves().length+'\n'+h;(navigator.clipboard?navigator.clipboard.writeText(dbg):Promise.reject()).then(function(){box.querySelector('#cpm').textContent='Copied. Send it to whoever shared Card Playbook with you.';}).catch(function(){var ta=document.createElement('textarea');ta.value=dbg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();box.querySelector('#cpm').textContent='Copied. Send it to whoever shared Card Playbook with you.';});};return;}
   finish(r.offers,0,r.target);

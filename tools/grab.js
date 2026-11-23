@@ -115,9 +115,16 @@ function pParse(t,T){
   if((m=all.match(/\bwas\s+(?:up to\s+)?(\d+(?:\.\d+)?)\s*(%|x|×|miles?)/i))) was=+m[1];
   var rl=ls.filter(function(l){ return !/^was\b/i.test(l)&&!/\bwas\s+\d/i.test(l)&&PRATE.test(l); })[0]||'';
   var nowM=rl.match(/(up to\s+)?(\d+(?:\.\d+)?)\s*(%|x\b|×|miles?|pts?|points?)/i); if(!nowM) return null;
-  var name=ls.filter(function(l){ return l!==rl&&!PRATE.test(l)&&!/^was\b/i.test(l)&&!PNOISE.test(l)&&/[a-z]/i.test(l)&&l.length>=2&&l.length<=50; })[0]||logoName(T||t)||'';
-  name=name.replace(/\s*(logo|icon)$/i,'').trim(); if(!name) return null;
+  var name=ls.filter(function(l){ return l!==rl&&!PRATE.test(l)&&!/^was\b/i.test(l)&&!PNOISE.test(l)&&/[a-z]/i.test(l)&&l.length>=2&&l.length<=80; }).map(pClean).filter(Boolean)[0]||pClean(logoName(T||t))||'';
+  if(!name) return null;
   var o={merchant:name, pct:+nowM[2], unit:nowM[3]==='%'?'pct':'x'}; if(nowM[1]) o.upto=1; if(was&&was<o.pct) o.was=was; return o;
+}
+function pClean(m){
+  m=String(m||'').replace(/\s+/g,' ').trim();
+  m=m.replace(/^(find out more at|shop at|shop now at|visit|go to|earn (?:cash back|points) at)\s+/i,'');
+  m=m.replace(/\s+[-–—|:]\s+(rakuten|rove|coupons?|cash back|promo).*$/i,'').replace(/\s+(coupons?|promo codes?)(\s+(and|&)\s+.*)?$/i,'').replace(/\s*(logo|icon)$/i,'').trim();
+  if (!m || /^\d+\s+of\s+\d+$/i.test(m) || /^(earn|shop|see|view|find|get|save|exclusive|featured|limited|new|more|select|all)\b/i.test(m) || /\.$/.test(m) || m.length>36) return '';
+  return m;
 }
 function pscan(){
   var seen=new Set(), out=[];

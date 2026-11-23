@@ -540,6 +540,10 @@ nav.tabbar button.on svg{color:#9ff5d0;filter:drop-shadow(0 0 9px rgba(52,211,15
 #portals .prow-v{flex:none;text-align:right;font-weight:700;font-size:15px;line-height:1.1}
 #portals .prow-v small{display:block;font-size:10px;font-weight:500;opacity:.65}
 #portals .prow-v.hot{color:#6ee7b7}
+#portals .phead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+#portals .phead h2{margin:0}
+#portals .prow-m small.ppay{opacity:.9;margin-top:2px}
+#portals .prow-m small.ppay b{font-weight:600!important;font-size:12px!important;white-space:normal!important;display:inline!important}
 
 /* ---- Public app: card picker ---- */
 body.pk-open{overflow:hidden}
@@ -1694,9 +1698,9 @@ document.addEventListener('click',function(e){
 // ---- Shopping portals (Rakuten, Rove): boosted store rates, read by the Grab offers bookmark ----
 var PORTALS={rakuten:'Rakuten', rove:'Rove'}, PORTAL_ALL=false;
 function portalItems(){
-  var out=[]; S.portals=S.portals||{};
-  Object.keys(PORTALS).forEach(function(k){ var p=S.portals[k]; if(!p) return; (p.items||[]).forEach(function(it){ out.push({p:k, it:it, v:portalVal(k,it)}); }); });
-  var rk=function(r){ return r.v*(r.it.upto?0.5:1)*(r.it.was?1.15:1); }; // 'up to' rates rarely apply in full
+  var out=[], cache={}; S.portals=S.portals||{};
+  Object.keys(PORTALS).forEach(function(k){ var p=S.portals[k]; if(!p) return; var seen={}; (p.items||[]).forEach(function(it){ var m=portalClean(it.m); if(!m||seen[m.toLowerCase()]) return; seen[m.toLowerCase()]=1; var x=JSON.parse(JSON.stringify(it)); x.m=m; var v=portalVal(k,x), pay=portalCardFor(m,cache); out.push({p:k, it:x, v:v, pay:pay, tot:v+(pay.use?pay.use.val:0)}); }); });
+  var rk=function(r){ return r.tot*(r.it.upto?0.6:1)*(r.it.was?1.1:1); }; // 'up to' rates rarely apply in full
   return out.sort(function(a,b){ return rk(b)-rk(a); });
 }
 function portalVal(k,it){ // cents back per $1
@@ -1709,25 +1713,50 @@ function portalRate(k,it){
   return it.unit==='pct' ? it.pct+'% back' : it.pct+'x Rove miles';
 }
 function portalAge(k){ var p=(S.portals||{})[k]; if(!p||!p.at) return null; return Math.floor((Date.now()-new Date(p.at))/864e5); }
+function portalClean(m){
+  m=String(m||'').replace(/\s+/g,' ').trim();
+  m=m.replace(/^(find out more at|shop at|shop now at|visit|go to|earn (?:cash back|points) at)\s+/i,'');
+  m=m.replace(/\s+[-–—|:]\s+(rakuten|rove|coupons?|cash back|promo).*$/i,'').replace(/\s+(coupons?|promo codes?)(\s+(and|&)\s+.*)?$/i,'').replace(/\s*(logo|icon)$/i,'').trim();
+  if (!m || /^\d+\s+of\s+\d+$/i.test(m) || /^(earn|shop|see|view|find|get|save|exclusive|featured|limited|new|more|select|all)\b/i.test(m) || /\.$/.test(m) || m.length>36) return '';
+  return m;
+}
+var PORTAL_CAT=[[/hotels?\b|expedia|booking\.com|priceline|vrbo|airbnb|marriott|hilton|hyatt|ihg|wyndham|agoda|trip\.com/i,'hotels'],[/airlines?|airways|united|delta|southwest|jetblue|alaska air|frontier|spirit|flights?/i,'flights'],[/hertz|avis|budget|enterprise|national car|sixt|turo|car rental/i,'cars'],[/doordash|uber eats|grubhub|postmates|seamless/i,'dining'],[/instacart|safeway|whole foods|kroger|albertsons/i,'grocery'],[/walmart|target/i,'superstore'],[/cvs|walgreens|rite aid/i,'drugstore']];
+function portalCatOf(m){ for(var i=0;i<PORTAL_CAT.length;i++) if(PORTAL_CAT[i][0].test(m)) return PORTAL_CAT[i][1]; return 'other'; }
+function portalCardFor(m, cache){
+  var k=portalCatOf(m);
+  if (!(k in cache)) cache[k]=(typeof ranked==='function'?ranked(k):[]).filter(function(x){return x.ok;});
+  var list=cache[k], best=list[0]?{card:list[0].card, val:list[0].val}:null, t=todayStr(), ml=m.toLowerCase();
+  var off=(S.offers||[]).filter(function(o){ if(o.used||(o.ends&&o.ends<t)) return false; var om=String(o.merchant||'').toLowerCase(); return om&&(om.indexOf(ml)>=0||ml.indexOf(om)>=0); })
+    .sort(function(a,b){ return offerValue(b)-offerValue(a); })[0];
+  var use=best;
+  if (off){ var oc=list.filter(function(x){return x.card.id===off.card;})[0]; use=oc?{card:oc.card, val:oc.val}:{card:cardById(off.card), val:0}; }
+  return {best:best, use:use, offer:off||null};
+}
 function portalCard(){
   var all=portalItems(); if(!all.length) return '';
-  var h='<div class="card" id="portals"><h2>Shopping portals</h2>';
-  var src=Object.keys(PORTALS).filter(function(k){return S.portals[k];}).map(function(k){ var d=portalAge(k); return PORTALS[k]+' '+(S.portals[k].items||[]).length+' stores · '+(d===0?'today':d===1?'yesterday':d+'d ago'); });
-  h+='<p class="sub" style="margin:0 0 8px">'+src.join(' · ')+'. Start at the portal, then pay with your best card: portal rewards stack on top of your card\'s points and card offers.</p>';
+  var fold=!!S.portalFold;
+  var h='<div class="card" id="portals"><div class="phead"><h2>Shopping portals</h2><button class="mini" data-pact="fold">'+(fold?'Expand':'Collapse')+'</button></div>';
+  var src=Object.keys(PORTALS).filter(function(k){return S.portals[k];}).map(function(k){ var d=portalAge(k); return PORTALS[k]+' · '+(d===0?'today':d===1?'yesterday':d+'d ago'); });
+  if (fold){ h+='<p class="sub" style="margin:0">'+all.length+' stores · best '+(Math.round(all[0].tot*10)/10)+'¢ per $ at '+esc(all[0].it.m)+'. '+src.join(' · ')+'</p></div>'; return h; }
+  h+='<p class="sub" style="margin:0 0 6px">To max out: open the store through the portal, add the card offer if there is one, then pay with the card shown. All three stack. '+src.join(' · ')+'.</p>';
   var stale=Object.keys(PORTALS).filter(function(k){ var d=portalAge(k); return d!=null&&d>=7; });
   if (stale.length) h+='<div class="note">Boosted rates change every few days. Tap the Grab offers bookmark on '+stale.map(function(k){return PORTALS[k];}).join(' and ')+' again to refresh.</div>';
+  if (all.length>4 && PORTAL_ALL) h+='<button class="btn ghost wide" data-pact="all" style="margin:4px 0 6px">Show top 4</button>';
   var qw=String(typeof OFFER_Q!=='undefined'?OFFER_Q:'').toLowerCase().split(/\s+/).filter(Boolean);
   all.forEach(function(r,i){
     var it=r.it, top=i<4, st=(it.m+' '+PORTALS[r.p]).toLowerCase();
     var show=qw.length? qw.every(function(x){return st.indexOf(x)>=0;}) : (top||PORTAL_ALL);
     var u=r.p==='rakuten'?(S.portalPay==='amex'?'x':'%'):(it.unit==='pct'?'%':'x');
-    h+='<div class="prow'+(top?' top':'')+'" data-ps="'+esc(st)+'"'+(show?'':' style="display:none"')+'><div class="prow-m"><b>'+esc(it.m)+'</b><small>'+PORTALS[r.p]+' · '+esc((it.upto?'up to ':'')+portalRate(r.p,it))+(it.was?' <s>was '+it.was+u+'</s>':'')+'</small></div><span class="prow-v'+(it.was?' hot':'')+'">'+(Math.round(r.v*10)/10)+'¢<small>per $</small></span></div>';
+    var pay=r.pay, card=pay.use&&pay.use.card;
+    var payLine=card?('Pay with <b>'+esc(card.name)+'</b> +'+(Math.round(pay.use.val*10)/10)+'¢'+(pay.offer?' · add its offer: '+esc(offerText(pay.offer)):'')):'';
+    h+='<div class="prow'+(top?' top':'')+'" data-ps="'+esc(st)+'"'+(show?'':' style="display:none"')+'><div class="prow-m"><b>'+esc(it.m)+'</b><small>'+PORTALS[r.p]+' '+esc((it.upto?'up to ':'')+portalRate(r.p,it).replace(' cash back','').replace(' Amex points',' Amex pts').replace(' Rove miles',' miles'))+(it.was?' <s>'+it.was+u+'</s>':'')+'</small>'+(payLine?'<small class="ppay">'+payLine+'</small>':'')+'</div><span class="prow-v'+(it.was?' hot':'')+'">'+(Math.round(r.tot*10)/10)+'¢<small>per $ total</small></span></div>';
   });
   if (all.length>4) h+='<button class="btn ghost wide" data-pact="all" id="portalmore">'+(PORTAL_ALL?'Show top 4':'Show all '+all.length)+'</button>';
   if (S.portals.rakuten) h+='<div class="row" style="margin-top:8px;align-items:center"><span class="sub" style="margin:0;flex:1">Rakuten pays you in</span><div class="seg" style="flex:none">'+[['cash','Cash'],['amex','Amex points']].map(function(o){ return '<button data-pact="pay" data-v="'+o[0]+'"'+((S.portalPay||'cash')===o[0]?' class="on"':'')+'>'+o[1]+'</button>'; }).join('')+'</div></div>';
-  h+='<p class="foot">¢ per $ uses your point values (Rove miles at '+((S.cpp&&S.cpp.rove)||1.2)+'¢). Boosted stores, marked with the old rate, are listed first at equal value.</p></div>';
+  h+='<p class="foot">Total = portal reward + your best card\'s rewards for that store, in cents per $1 at your point values (Rove miles at '+((S.cpp&&S.cpp.rove)||1.2)+'¢). Card offers are extra on top.</p></div>';
   return h;
 }
+
 function portalPasteBlock(){
   var p=OP.p, n=p.offers.length, nb=p.offers.filter(function(o){return o.was;}).length;
   var h='<div class="opaste"><div class="note ok">Found '+n+' '+PORTALS[p.iss]+' store'+(n===1?'':'s')+(nb?' ('+nb+' boosted)':'')+'.</div>';
@@ -1738,7 +1767,7 @@ function portalPasteBlock(){
 function portalImport(){
   var p=OP.p; S.portals=S.portals||{};
   var seen={}, items=[];
-  p.offers.forEach(function(o){ var m=String(o.merchant||'').slice(0,60).trim(), r=+o.pct; if(!m||!(r>0)) return; var k=m.toLowerCase(); if(seen[k]&&seen[k].pct>=r) return;
+  p.offers.forEach(function(o){ var m=portalClean(o.merchant), r=+o.pct; if(!m||!(r>0)) return; var k=m.toLowerCase(); if(seen[k]&&seen[k].pct>=r) return;
     var it={m:m, pct:r, unit:o.unit==='pct'?'pct':'x'}; if(p.iss==='rakuten') it.unit='pct'; if(+o.was>0&&+o.was<r) it.was=+o.was; if(o.upto) it.upto=1;
     if(seen[k]) items[items.indexOf(seen[k])]=it; else items.push(it); seen[k]=it; });
   S.portals[p.iss]={at:new Date().toISOString(), items:items.slice(0,500)};
@@ -1749,7 +1778,8 @@ document.addEventListener('click',function(e){
   var b=e.target.closest&&e.target.closest('[data-pact]'); if(!b) return;
   e.preventDefault(); e.stopImmediatePropagation();
   var y=window.scrollY;
-  if (b.dataset.pact==='all'){ PORTAL_ALL=!PORTAL_ALL; render(); window.scrollTo(0,y); return; }
+  if (b.dataset.pact==='fold'){ S.portalFold=!S.portalFold; PORTAL_ALL=false; changed(); var pc=document.getElementById('portals'); if(pc&&pc.getBoundingClientRect().top<0) pc.scrollIntoView(); else window.scrollTo(0,y); return; }
+  if (b.dataset.pact==='all'){ var was=PORTAL_ALL; PORTAL_ALL=!PORTAL_ALL; render(); var pc2=document.getElementById('portals'); if(was&&pc2&&pc2.getBoundingClientRect().top<0) pc2.scrollIntoView(); else window.scrollTo(0,y); return; }
   if (b.dataset.pact==='pay'){ S.portalPay=b.dataset.v; changed(); window.scrollTo(0,y); }
 }, true);
 document.addEventListener('input',function(e){
